@@ -49,7 +49,7 @@ fi
 
 # Copy the statusline script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-STATUSLINE_SCRIPT="$CLAUDE_DIR/claude-statusline.py"
+STATUSLINE_SCRIPT="$CLAUDE_DIR/ccstatus-fixed.py"
 
 echo -e "${YELLOW}→${NC} Installing statusline script..."
 cp "$SCRIPT_DIR/claude-statusline.py" "$STATUSLINE_SCRIPT"

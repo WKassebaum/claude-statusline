@@ -176,8 +176,8 @@ def calculate_status():
     today_str = f"${today_cost:.2f}"
     block_str = f"${block_cost:.2f}"
     
-    # Format token count - use session tokens if available, otherwise block tokens
-    display_tokens = session_tokens if session_tokens > 0 else block_tokens
+    # Format token count - use block tokens for current usage
+    display_tokens = block_tokens
     tokens_str = format_number(display_tokens)
     
     # Build status line

@@ -45,8 +45,19 @@ The statusline will automatically update in Claude Code.
 ## 📊 Statusline Format
 
 ```
-🤖 Opus 4.1 | 💰 $2091.24 session / $54.10 today / $50.26 block (1h 55m left) | 🔥 172K/min | 861.5M tokens | 26.8% used | ~1h55m left
+🤖 Opus 4.1 | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
 ```
+
+### What Each Field Shows
+
+- **Model**: Currently active Claude model (Opus 4.1)
+- **Session cost**: Total cost for current working directory session
+- **Today's cost**: Total usage for today across all sessions
+- **Block cost**: Current 5-hour block usage and time remaining
+- **Burn rate**: Token consumption rate in tokens per minute
+- **Token count**: Current block tokens (matches ccusage display)
+- **Usage %**: Percentage of 97.6M token block limit used
+- **Time left**: Estimated time remaining based on burn rate
 
 **Components:**
 - **Model**: Current Claude model
