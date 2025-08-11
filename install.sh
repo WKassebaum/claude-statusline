@@ -2,6 +2,7 @@
 
 # Claude Code Enhanced Statusline Installer
 # Installs the enhanced statusline for Claude Code
+# Supports both regular and GNU Stow managed installations
 
 set -e
 
@@ -9,6 +10,7 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -41,34 +43,106 @@ echo -e "${GREEN}✓${NC} Python 3 is available"
 CLAUDE_DIR="$HOME/.claude"
 CLAUDE_SETTINGS="$CLAUDE_DIR/settings.json"
 
+# Function to check if a path is a GNU Stow symlink
+is_stow_managed() {
+    local path="$1"
+    if [ -L "$path" ]; then
+        # Check if the symlink points to a dotfiles directory
+        local target=$(readlink "$path")
+        if [[ "$target" == *"dotfiles"* ]] || [[ "$target" == *"stow"* ]]; then
+            return 0
+        fi
+        # Also check the resolved path
+        local resolved=$(readlink -f "$path" 2>/dev/null || echo "")
+        if [[ "$resolved" == *"dotfiles"* ]] || [[ "$resolved" == *"stow"* ]]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Detect if using GNU Stow
+USING_STOW=false
+STOW_BASE_DIR=""
+STOW_PACKAGE=""
+
+if is_stow_managed "$CLAUDE_DIR" || is_stow_managed "$CLAUDE_SETTINGS"; then
+    USING_STOW=true
+    echo -e "${BLUE}🔗 GNU Stow installation detected${NC}"
+    
+    # Try to determine the stow directory structure
+    if [ -L "$CLAUDE_SETTINGS" ]; then
+        STOW_TARGET=$(readlink -f "$CLAUDE_SETTINGS" 2>/dev/null)
+        # Extract the dotfiles base directory (e.g., /Users/wrk/dotfiles)
+        if [[ "$STOW_TARGET" =~ (.*/dotfiles)/([^/]+)/.claude/settings.json ]]; then
+            STOW_BASE_DIR="${BASH_REMATCH[1]}"
+            STOW_PACKAGE="${BASH_REMATCH[2]}"
+            echo -e "${GREEN}✓${NC} Stow base directory: $STOW_BASE_DIR"
+            echo -e "${GREEN}✓${NC} Stow package: $STOW_PACKAGE"
+        fi
+    elif [ -L "$CLAUDE_DIR" ]; then
+        STOW_TARGET=$(readlink -f "$CLAUDE_DIR" 2>/dev/null)
+        if [[ "$STOW_TARGET" =~ (.*/dotfiles)/([^/]+)/.claude ]]; then
+            STOW_BASE_DIR="${BASH_REMATCH[1]}"
+            STOW_PACKAGE="${BASH_REMATCH[2]}"
+            echo -e "${GREEN}✓${NC} Stow base directory: $STOW_BASE_DIR"
+            echo -e "${GREEN}✓${NC} Stow package: $STOW_PACKAGE"
+        fi
+    fi
+    
+    if [ -z "$STOW_BASE_DIR" ]; then
+        echo -e "${YELLOW}⚠${NC} Could not determine Stow structure automatically"
+        echo -n "Enter your dotfiles directory path (e.g., /Users/you/dotfiles): "
+        read -r STOW_BASE_DIR
+        echo -n "Enter the Stow package name for Claude (e.g., claude): "
+        read -r STOW_PACKAGE
+    fi
+    
+    # Set the actual target directory for Stow installations
+    ACTUAL_CLAUDE_DIR="$STOW_BASE_DIR/$STOW_PACKAGE/.claude"
+    ACTUAL_SETTINGS="$ACTUAL_CLAUDE_DIR/settings.json"
+else
+    echo -e "${GREEN}✓${NC} Standard installation detected"
+    ACTUAL_CLAUDE_DIR="$CLAUDE_DIR"
+    ACTUAL_SETTINGS="$CLAUDE_SETTINGS"
+fi
+
 # Create .claude directory if it doesn't exist
-if [ ! -d "$CLAUDE_DIR" ]; then
-    echo -e "${YELLOW}→${NC} Creating $CLAUDE_DIR directory..."
-    mkdir -p "$CLAUDE_DIR"
+if [ ! -d "$ACTUAL_CLAUDE_DIR" ]; then
+    echo -e "${YELLOW}→${NC} Creating $ACTUAL_CLAUDE_DIR directory..."
+    mkdir -p "$ACTUAL_CLAUDE_DIR"
 fi
 
 # Copy the statusline script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-STATUSLINE_SCRIPT="$CLAUDE_DIR/ccstatus-fixed.py"
+
+# For Stow, install to the actual dotfiles location
+if [ "$USING_STOW" = true ]; then
+    STATUSLINE_SCRIPT="$ACTUAL_CLAUDE_DIR/ccstatus-fixed.py"
+    STATUSLINE_PATH_IN_SETTINGS="$CLAUDE_DIR/ccstatus-fixed.py"  # This is what settings.json should reference
+else
+    STATUSLINE_SCRIPT="$ACTUAL_CLAUDE_DIR/ccstatus-fixed.py"
+    STATUSLINE_PATH_IN_SETTINGS="$STATUSLINE_SCRIPT"
+fi
 
 echo -e "${YELLOW}→${NC} Installing statusline script..."
-cp "$SCRIPT_DIR/claude-statusline.py" "$STATUSLINE_SCRIPT"
+cp "$SCRIPT_DIR/ccstatus-fixed.py" "$STATUSLINE_SCRIPT"
 chmod +x "$STATUSLINE_SCRIPT"
 echo -e "${GREEN}✓${NC} Statusline script installed to $STATUSLINE_SCRIPT"
 
 # Backup existing settings if they exist
-if [ -f "$CLAUDE_SETTINGS" ]; then
-    BACKUP_FILE="$CLAUDE_SETTINGS.backup.$(date +%Y%m%d_%H%M%S)"
+if [ -f "$ACTUAL_SETTINGS" ]; then
+    BACKUP_FILE="$ACTUAL_SETTINGS.backup.$(date +%Y%m%d_%H%M%S)"
     echo -e "${YELLOW}→${NC} Backing up existing settings to $BACKUP_FILE"
-    cp "$CLAUDE_SETTINGS" "$BACKUP_FILE"
+    cp "$ACTUAL_SETTINGS" "$BACKUP_FILE"
 fi
 
 # Create or update settings.json
 echo -e "${YELLOW}→${NC} Updating Claude settings..."
 
-if [ -f "$CLAUDE_SETTINGS" ]; then
+if [ -f "$ACTUAL_SETTINGS" ]; then
     # Check if settings already has statusLine configuration
-    if python3 -c "import json; data=json.load(open('$CLAUDE_SETTINGS')); exit(0 if 'statusLine' in data else 1)" 2>/dev/null; then
+    if python3 -c "import json; data=json.load(open('$ACTUAL_SETTINGS')); exit(0 if 'statusLine' in data else 1)" 2>/dev/null; then
         echo -e "${YELLOW}!${NC} Existing statusLine configuration found"
         echo -n "Do you want to replace it? (y/n): "
         read -r response
@@ -76,13 +150,13 @@ if [ -f "$CLAUDE_SETTINGS" ]; then
             # Update existing settings with statusLine
             python3 -c "
 import json
-with open('$CLAUDE_SETTINGS', 'r') as f:
+with open('$ACTUAL_SETTINGS', 'r') as f:
     data = json.load(f)
 data['statusLine'] = {
     'type': 'command',
-    'command': 'python3 $STATUSLINE_SCRIPT'
+    'command': 'python3 $STATUSLINE_PATH_IN_SETTINGS'
 }
-with open('$CLAUDE_SETTINGS', 'w') as f:
+with open('$ACTUAL_SETTINGS', 'w') as f:
     json.dump(data, f, indent=2)
 "
             echo -e "${GREEN}✓${NC} Updated existing statusLine configuration"
@@ -93,28 +167,40 @@ with open('$CLAUDE_SETTINGS', 'w') as f:
         # Add statusLine to existing settings
         python3 -c "
 import json
-with open('$CLAUDE_SETTINGS', 'r') as f:
+with open('$ACTUAL_SETTINGS', 'r') as f:
     data = json.load(f)
 data['statusLine'] = {
     'type': 'command',
-    'command': 'python3 $STATUSLINE_SCRIPT'
+    'command': 'python3 $STATUSLINE_PATH_IN_SETTINGS'
 }
-with open('$CLAUDE_SETTINGS', 'w') as f:
+with open('$ACTUAL_SETTINGS', 'w') as f:
     json.dump(data, f, indent=2)
 "
         echo -e "${GREEN}✓${NC} Added statusLine configuration to existing settings"
     fi
 else
     # Create new settings file
-    cat > "$CLAUDE_SETTINGS" << EOF
+    cat > "$ACTUAL_SETTINGS" << EOF
 {
   "statusLine": {
     "type": "command",
-    "command": "python3 $STATUSLINE_SCRIPT"
+    "command": "python3 $STATUSLINE_PATH_IN_SETTINGS"
   }
 }
 EOF
     echo -e "${GREEN}✓${NC} Created new settings file with statusLine configuration"
+fi
+
+# If using Stow, re-stow to ensure symlinks are correct
+if [ "$USING_STOW" = true ]; then
+    echo -e "${YELLOW}→${NC} Re-stowing $STOW_PACKAGE to update symlinks..."
+    cd "$STOW_BASE_DIR"
+    if command -v stow &> /dev/null; then
+        stow -R "$STOW_PACKAGE"
+        echo -e "${GREEN}✓${NC} GNU Stow symlinks updated"
+    else
+        echo -e "${YELLOW}⚠${NC} GNU Stow not found in PATH, please run 'stow -R $STOW_PACKAGE' manually from $STOW_BASE_DIR"
+    fi
 fi
 
 echo ""
@@ -122,6 +208,15 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}✅ Installation Complete!${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+if [ "$USING_STOW" = true ]; then
+    echo -e "${BLUE}🔗 GNU Stow Installation Summary:${NC}"
+    echo "  • Script installed to: $STATUSLINE_SCRIPT"
+    echo "  • Settings updated in: $ACTUAL_SETTINGS"
+    echo "  • Stow package: $STOW_PACKAGE"
+    echo ""
+fi
+
 echo "The enhanced statusline will show:"
 echo "  • Accurate session costs"
 echo "  • Today's total usage"
@@ -133,7 +228,7 @@ echo ""
 echo "The statusline will update automatically in Claude Code."
 echo ""
 echo "To test the statusline manually, run:"
-echo "  echo '{}' | python3 $STATUSLINE_SCRIPT"
+echo "  echo '{}' | python3 $STATUSLINE_PATH_IN_SETTINGS"
 echo ""
 echo "To uninstall, run:"
 echo "  ./uninstall.sh"
