@@ -118,15 +118,15 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # For Stow, install to the actual dotfiles location
 if [ "$USING_STOW" = true ]; then
-    STATUSLINE_SCRIPT="$ACTUAL_CLAUDE_DIR/ccstatus-fixed.py"
-    STATUSLINE_PATH_IN_SETTINGS="$CLAUDE_DIR/ccstatus-fixed.py"  # This is what settings.json should reference
+    STATUSLINE_SCRIPT="$ACTUAL_CLAUDE_DIR/claude-statusline.py"
+    STATUSLINE_PATH_IN_SETTINGS="$CLAUDE_DIR/claude-statusline.py"  # This is what settings.json should reference
 else
-    STATUSLINE_SCRIPT="$ACTUAL_CLAUDE_DIR/ccstatus-fixed.py"
+    STATUSLINE_SCRIPT="$ACTUAL_CLAUDE_DIR/claude-statusline.py"
     STATUSLINE_PATH_IN_SETTINGS="$STATUSLINE_SCRIPT"
 fi
 
 echo -e "${YELLOW}→${NC} Installing statusline script..."
-cp "$SCRIPT_DIR/ccstatus-fixed.py" "$STATUSLINE_SCRIPT"
+cp "$SCRIPT_DIR/claude-statusline.py" "$STATUSLINE_SCRIPT"
 chmod +x "$STATUSLINE_SCRIPT"
 echo -e "${GREEN}✓${NC} Statusline script installed to $STATUSLINE_SCRIPT"
 
@@ -196,8 +196,22 @@ if [ "$USING_STOW" = true ]; then
     echo -e "${YELLOW}→${NC} Re-stowing $STOW_PACKAGE to update symlinks..."
     cd "$STOW_BASE_DIR"
     if command -v stow &> /dev/null; then
-        stow -R "$STOW_PACKAGE"
-        echo -e "${GREEN}✓${NC} GNU Stow symlinks updated"
+        # First try normal re-stow
+        if stow -R "$STOW_PACKAGE" 2>/dev/null; then
+            echo -e "${GREEN}✓${NC} GNU Stow symlinks updated"
+        else
+            # If conflicts, ask user about --adopt
+            echo -e "${YELLOW}⚠${NC} Stow conflicts detected. This usually means files exist that aren't symlinks."
+            echo -n "Use --adopt to take ownership of conflicting files? (y/n): "
+            read -r adopt_response
+            if [[ "$adopt_response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                stow --adopt -R "$STOW_PACKAGE"
+                echo -e "${GREEN}✓${NC} GNU Stow symlinks updated with --adopt"
+            else
+                echo -e "${YELLOW}⚠${NC} Stow conflicts remain. Please resolve manually:"
+                echo "  cd $STOW_BASE_DIR && stow -R $STOW_PACKAGE"
+            fi
+        fi
     else
         echo -e "${YELLOW}⚠${NC} GNU Stow not found in PATH, please run 'stow -R $STOW_PACKAGE' manually from $STOW_BASE_DIR"
     fi

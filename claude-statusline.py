@@ -73,8 +73,10 @@ def get_current_working_directory():
     except:
         return None
 
-def calculate_status():
+def calculate_status(claude_data=None):
     """Calculate the status line values"""
+    if claude_data is None:
+        claude_data = {}
     blocks_data, session_data, daily_data = get_ccusage_data()
     
     # Get current working directory
@@ -168,8 +170,56 @@ def calculate_status():
         mins = int(time_remaining_mins % 60)
         time_left = f"~{hours}h{mins}m"
     
-    # Format the status line
-    model = "Opus 4.1"  # Default model - could be detected from data
+    # Detect model from current block or stdin
+    model = "Claude"  # Default fallback
+    
+    # Try to get model from stdin (passed by Claude Code)
+    if 'model' in claude_data and claude_data['model']:
+        model_data = claude_data['model']
+        model_id = ""
+        
+        # Handle both string and dict model formats
+        if isinstance(model_data, str):
+            model_id = model_data
+        elif isinstance(model_data, dict):
+            # Try common dict keys
+            model_id = model_data.get('name', model_data.get('id', model_data.get('model', '')))
+        
+        # Parse model name from ID if we got a string
+        if model_id and isinstance(model_id, str):
+            model_id_lower = model_id.lower()
+            if 'opus-4-1' in model_id_lower:
+                model = "Opus 4.1"
+            elif 'opus-4' in model_id_lower:
+                model = "Opus 4"
+            elif 'sonnet-4' in model_id_lower:
+                model = "Sonnet 4"
+            elif 'sonnet-3-5' in model_id_lower or 'sonnet-20241022' in model_id_lower:
+                model = "Sonnet 3.5"
+            elif 'sonnet' in model_id_lower:
+                model = "Sonnet"
+            elif 'haiku' in model_id_lower:
+                model = "Haiku"
+            elif 'claude-' in model_id_lower:
+                # Try to extract version from model ID
+                model = model_id.replace('claude-', '').replace('-', ' ').title()
+    
+    # If no model from stdin, try to detect from recent block models
+    elif current_block and 'models' in current_block and current_block['models']:
+        # Get most recent non-synthetic model
+        for model_id in reversed(current_block['models']):
+            if model_id != '<synthetic>':
+                if 'opus-4-1' in model_id:
+                    model = "Opus 4.1"
+                elif 'opus-4' in model_id:
+                    model = "Opus 4"
+                elif 'sonnet-4' in model_id:
+                    model = "Sonnet 4"
+                elif 'sonnet-3' in model_id:
+                    model = "Sonnet 3.5"
+                elif 'haiku' in model_id:
+                    model = "Haiku"
+                break
     
     # Format costs
     session_str = f"${session_cost:.2f}" if session_found else "N/A"
@@ -206,7 +256,7 @@ def main():
             claude_data = {}
         
         # Calculate status
-        status = calculate_status()
+        status = calculate_status(claude_data)
         
         # Output the status line
         print(status)
