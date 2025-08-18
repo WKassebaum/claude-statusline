@@ -148,7 +148,7 @@ if [ -f "$ACTUAL_SETTINGS" ]; then
         read -r response
         if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
             # Update existing settings with statusLine
-            python3 -c "
+            python3 << EOF
 import json
 with open('$ACTUAL_SETTINGS', 'r') as f:
     data = json.load(f)
@@ -158,14 +158,14 @@ data['statusLine'] = {
 }
 with open('$ACTUAL_SETTINGS', 'w') as f:
     json.dump(data, f, indent=2)
-"
+EOF
             echo -e "${GREEN}✓${NC} Updated existing statusLine configuration"
         else
             echo -e "${YELLOW}→${NC} Keeping existing statusLine configuration"
         fi
     else
         # Add statusLine to existing settings
-        python3 -c "
+        python3 << EOF
 import json
 with open('$ACTUAL_SETTINGS', 'r') as f:
     data = json.load(f)
@@ -175,7 +175,7 @@ data['statusLine'] = {
 }
 with open('$ACTUAL_SETTINGS', 'w') as f:
     json.dump(data, f, indent=2)
-"
+EOF
         echo -e "${GREEN}✓${NC} Added statusLine configuration to existing settings"
     fi
 else

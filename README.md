@@ -40,6 +40,8 @@ npm install -g ccusage
 
 ## 🚀 Quick Install
 
+### Option 1: Standard Installation (Recommended)
+
 ```bash
 # Clone the repository
 git clone https://github.com/WKassebaum/claude-statusline-fix.git
@@ -47,6 +49,19 @@ cd claude-statusline-fix
 
 # Run the installer
 ./install.sh
+```
+
+### Option 2: Binary Installation
+
+Installs to `~/.local/bin` for system-wide access:
+
+```bash
+# Clone the repository
+git clone https://github.com/WKassebaum/claude-statusline-fix.git
+cd claude-statusline-fix
+
+# Run the binary installer
+./install-bin.sh
 ```
 
 The statusline will automatically update in Claude Code.
