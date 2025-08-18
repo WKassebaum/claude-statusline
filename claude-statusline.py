@@ -79,7 +79,7 @@ def get_codeindex_status():
         # Get current directory info
         cwd = get_current_working_directory()
         if not cwd:
-            return "❓ unknown dir"
+            return None  # Return None instead of error string
         
         project_name = cwd.split('/')[-1]
         expected_collection = f"claude-codeindex-{project_name}"
@@ -103,15 +103,26 @@ def get_codeindex_status():
         collections_data = None
         logs_data = None
         
-        if collections_result.returncode == 0:
-            collections_data = json.loads(collections_result.stdout)
+        if collections_result.returncode == 0 and collections_result.stdout:
+            try:
+                collections_data = json.loads(collections_result.stdout)
+            except (json.JSONDecodeError, ValueError):
+                return None  # Return None on parse error
         
-        if logs_result.returncode == 0:
-            logs_data = json.loads(logs_result.stdout)
+        if logs_result.returncode == 0 and logs_result.stdout:
+            try:
+                logs_data = json.loads(logs_result.stdout)
+            except (json.JSONDecodeError, ValueError):
+                logs_data = None  # Continue without logs
         
-        return parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection)
+        result = parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection)
         
-    except:
+        # Validate result before returning
+        if result and isinstance(result, str) and len(result) > 0:
+            return result
+        return None
+        
+    except Exception:
         # Fallback to legacy method
         try:
             result = subprocess.run(
@@ -120,19 +131,28 @@ def get_codeindex_status():
                 text=True,
                 timeout=2
             )
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                return parse_codeindex_collections(data)
+            if result.returncode == 0 and result.stdout:
+                try:
+                    data = json.loads(result.stdout)
+                    parsed = parse_codeindex_collections(data)
+                    # Validate parsed result
+                    if parsed and isinstance(parsed, str) and len(parsed) > 0:
+                        return parsed
+                except (json.JSONDecodeError, ValueError):
+                    pass
             return None
-        except:
+        except Exception:
             return None
 
 def parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection):
     """Parse codeindex status with progress tracking"""
     if not collections_data or 'result' not in collections_data:
-        return "❌ service down"
+        return None  # Return None when service is unreachable
     
-    collections = collections_data['result']['collections']
+    try:
+        collections = collections_data['result']['collections']
+    except (KeyError, TypeError):
+        return None  # Return None on data structure errors
     
     # Check if current project has a collection
     current_collection = None
@@ -213,12 +233,12 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
 def parse_codeindex_collections(data):
     """Parse Qdrant collections response to show current project status"""
     if not data or 'result' not in data or 'collections' not in data['result']:
-        return "❌ service down"
+        return None  # Return None when data is invalid
     
     # Get current working directory to check if current project is indexed
     cwd = get_current_working_directory()
     if not cwd:
-        return "❓ unknown dir"
+        return None  # Return None when can't determine directory
     
     # Extract project name from current directory
     project_name = cwd.split('/')[-1]
@@ -264,10 +284,17 @@ def parse_codeindex_data(data):
 
 def format_codeindex_status():
     """Format codeindex status for status line (optional)"""
-    status = get_codeindex_status()
-    if status is None:
-        return None  # Service unavailable, skip section
-    return f"🔍 {status}"
+    try:
+        status = get_codeindex_status()
+        # Validate status is a proper string before formatting
+        if status is None or not isinstance(status, str) or len(status) == 0:
+            return None  # Service unavailable, skip section
+        # Additional check for unexpected values
+        if "undefined" in status.lower() or "error" in status.lower():
+            return None  # Skip if status contains error indicators
+        return f"🔍 {status}"
+    except Exception:
+        return None  # Return None on any error
 
 def calculate_status(claude_data=None):
     """Calculate the status line values"""
