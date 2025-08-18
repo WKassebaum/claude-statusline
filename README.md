@@ -60,17 +60,23 @@ The statusline will automatically update in Claude Code.
 
 **With codeindex integration** (when available):
 ```
-🤖 Opus 4.1 | 🔍 ●claude-multi-agent | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
+🤖 Opus 4.1 | 🔍 ✅ claude-codeindex | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
+```
+
+**During active indexing**:
+```
+🤖 Opus 4.1 | 🔍 🔄 (42%) my-project | 💰 $3.25 session / $81.14 today ...
 ```
 
 ### What Each Field Shows
 
 - **Model**: Currently active Claude model (Opus 4.1)
-- **Codeindex** (optional): Active codebase indexing status
-  - `🔍 ●project-name` - Active watcher  
-  - `🔍 ⚠️project-name` - Watcher with errors
-  - `🔍 idle` - Service available, no active watchers
-  - (not shown) - Service unavailable (graceful fallback)
+- **Codeindex** (optional): Current project indexing status
+  - `🔍 ✅ project-name` - Project is fully indexed
+  - `🔍 ❌ project-name` - Project not indexed  
+  - `🔍 🔄 (42%) project-name` - Currently indexing (42% complete)
+  - `🔍 ❌ service down` - Service unavailable
+  - (not shown) - codeindex not installed (graceful fallback)
 - **Session cost**: Total cost for current working directory session
 - **Today's cost**: Total usage for today across all sessions
 - **Block cost**: Current 5-hour block usage and time remaining
@@ -135,17 +141,28 @@ The statusline automatically detects and displays codeindex status when availabl
 
 | Indicator | Meaning | Description |
 |-----------|---------|-------------|
-| `🔍 ●project-name` | Active | Codeindex is actively watching project |
-| `🔍 ⚠️project-name` | Errors | Watcher has errors but still running |
-| `🔍 idle` | Available | Service running, no active watchers |
-| (not shown) | Unavailable | Service not running (graceful fallback) |
+| `🔍 ✅ project-name` | Indexed | Project is fully indexed and ready |
+| `🔍 ❌ project-name` | Not Indexed | Project not in the index |
+| `🔍 🔄 (23%) project-name` | Indexing | Currently indexing, 23% complete |
+| `🔍 🔄 (89%) project-name` | Almost Done | Indexing nearly complete |
+| `🔍 ❌ service down` | Service Error | codeindex-service not running |
+| (not shown) | Not Installed | codeindex not available (graceful fallback) |
 
 ### Benefits
 
-- **At-a-glance status** - See which project is being indexed
-- **Error detection** - Immediate notification of indexing issues  
+- **Current project awareness** - Shows status of your working directory
+- **Real-time progress** - Live percentage updates during indexing
+- **Instant feedback** - Know if your project is indexed at a glance  
 - **Zero configuration** - Works automatically when codeindex available
 - **Graceful degradation** - No impact when codeindex unavailable
+
+### How Progress Tracking Works
+
+The statusline monitors codeindex logs for active indexing operations:
+1. Detects `📝 Inserting` messages in recent logs
+2. Calculates progress based on insertion activity over time
+3. Updates percentage in real-time as indexing proceeds
+4. Shows `✅` when complete or `❌` if not indexed
 
 ## 🗑️ Uninstall
 
@@ -177,10 +194,15 @@ The script:
 - This is normal - codeindex integration is optional
 - Statusline works perfectly without codeindex
 
-**Codeindex shows "idle" but I started it**
+**Codeindex shows "❌ project-name" but I started indexing**
 - Check service status: `curl -s http://localhost:3847/status`
-- Ensure you ran `/codeindex:start` in the correct directory
-- Service may be starting up - wait 5-10 seconds
+- Verify collections exist: `curl -s http://localhost:6333/collections`
+- Large projects may take time - check progress with `codeindex projects`
+
+**Codeindex shows percentage stuck at same value**
+- Normal for large projects - indexing pauses between file batches
+- Check activity: `curl -s http://localhost:3847/logs`
+- Progress updates when new files are inserted
 
 ## 📄 License
 
