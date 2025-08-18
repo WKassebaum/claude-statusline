@@ -1,6 +1,6 @@
 # Claude Code Enhanced Statusline
 
-Enhanced statusline for Claude Code that provides accurate token usage, costs, and burn rate metrics.
+Enhanced statusline for Claude Code that provides accurate token usage, costs, burn rate metrics, and optional codeindex integration.
 
 ## ✨ Features
 
@@ -9,6 +9,7 @@ Enhanced statusline for Claude Code that provides accurate token usage, costs, a
 - 🔥 **Token burn rate** - Displayed in tokens/min with smart K/M/B formatting
 - ⏱️ **Time remaining** - Precise time left in current billing block
 - 🎯 **Session detection** - Automatic detection of current project session
+- 🔍 **Codeindex integration** (optional) - Show active codebase indexing status
 
 ## 📋 Prerequisites
 
@@ -28,6 +29,14 @@ npm install -g ccusage
 
 - Python 3
 - Claude Code
+- curl (for optional codeindex integration)
+
+### Optional Dependencies
+
+- **claude-codeindex** - For codebase indexing status display
+  - If installed and running, shows active indexing status
+  - Gracefully falls back if unavailable
+  - No configuration needed - auto-detected
 
 ## 🚀 Quick Install
 
@@ -44,13 +53,24 @@ The statusline will automatically update in Claude Code.
 
 ## 📊 Statusline Format
 
+**Standard format**:
 ```
 🤖 Opus 4.1 | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
+```
+
+**With codeindex integration** (when available):
+```
+🤖 Opus 4.1 | 🔍 ●claude-multi-agent | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
 ```
 
 ### What Each Field Shows
 
 - **Model**: Currently active Claude model (Opus 4.1)
+- **Codeindex** (optional): Active codebase indexing status
+  - `🔍 ●project-name` - Active watcher  
+  - `🔍 ⚠️project-name` - Watcher with errors
+  - `🔍 idle` - Service available, no active watchers
+  - (not shown) - Service unavailable (graceful fallback)
 - **Session cost**: Total cost for current working directory session
 - **Today's cost**: Total usage for today across all sessions
 - **Block cost**: Current 5-hour block usage and time remaining
@@ -92,6 +112,41 @@ Test the statusline output:
 echo '{}' | python3 ~/.claude/claude-statusline.py
 ```
 
+### Testing Codeindex Integration
+
+If you have claude-codeindex installed, you can test the integration:
+
+```bash
+# Check if codeindex service is running
+curl -s http://localhost:3847/health
+
+# Start codeindex in a project directory
+/codeindex:start
+
+# You should see the codeindex status in your statusline:
+# 🤖 Opus 4.1 | 🔍 ●your-project-name | 💰 ...
+```
+
+## 🔍 Codeindex Integration
+
+The statusline automatically detects and displays codeindex status when available.
+
+### Status Indicators
+
+| Indicator | Meaning | Description |
+|-----------|---------|-------------|
+| `🔍 ●project-name` | Active | Codeindex is actively watching project |
+| `🔍 ⚠️project-name` | Errors | Watcher has errors but still running |
+| `🔍 idle` | Available | Service running, no active watchers |
+| (not shown) | Unavailable | Service not running (graceful fallback) |
+
+### Benefits
+
+- **At-a-glance status** - See which project is being indexed
+- **Error detection** - Immediate notification of indexing issues  
+- **Zero configuration** - Works automatically when codeindex available
+- **Graceful degradation** - No impact when codeindex unavailable
+
 ## 🗑️ Uninstall
 
 ```bash
@@ -116,6 +171,16 @@ The script:
 **Session shows N/A**
 - Script detects sessions based on current working directory
 - Ensure you're in an active project directory
+
+**Codeindex status not showing**
+- Check if codeindex service is running: `curl -s http://localhost:3847/health`
+- This is normal - codeindex integration is optional
+- Statusline works perfectly without codeindex
+
+**Codeindex shows "idle" but I started it**
+- Check service status: `curl -s http://localhost:3847/status`
+- Ensure you ran `/codeindex:start` in the correct directory
+- Service may be starting up - wait 5-10 seconds
 
 ## 📄 License
 

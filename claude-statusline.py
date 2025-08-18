@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Claude Code Enhanced Statusline
-Displays accurate token usage, costs, and burn rate for Claude Code sessions.
+Claude Code Enhanced Statusline with Optional Codeindex Integration
+Displays accurate token usage, costs, burn rate, and optional codeindex status for Claude Code sessions.
 
 Author: Claude Code Community
 License: MIT
@@ -72,6 +72,202 @@ def get_current_working_directory():
         return cwd
     except:
         return None
+
+def get_codeindex_status():
+    """Get codeindex status with progress tracking"""
+    try:
+        # Get current directory info
+        cwd = get_current_working_directory()
+        if not cwd:
+            return "❓ unknown dir"
+        
+        project_name = cwd.split('/')[-1]
+        expected_collection = f"claude-codeindex-{project_name}"
+        
+        # Check collections and logs in parallel
+        collections_result = subprocess.run(
+            ["curl", "-s", "http://localhost:6333/collections"],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        
+        logs_result = subprocess.run(
+            ["curl", "-s", "http://localhost:3847/logs"],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        
+        # Parse results
+        collections_data = None
+        logs_data = None
+        
+        if collections_result.returncode == 0:
+            collections_data = json.loads(collections_result.stdout)
+        
+        if logs_result.returncode == 0:
+            logs_data = json.loads(logs_result.stdout)
+        
+        return parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection)
+        
+    except:
+        # Fallback to legacy method
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "http://localhost:6333/collections"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                return parse_codeindex_collections(data)
+            return None
+        except:
+            return None
+
+def parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection):
+    """Parse codeindex status with progress tracking"""
+    if not collections_data or 'result' not in collections_data:
+        return "❌ service down"
+    
+    collections = collections_data['result']['collections']
+    
+    # Check if current project has a collection
+    current_collection = None
+    for collection in collections:
+        if collection.get('name', '') == expected_collection:
+            current_collection = collection
+            break
+    
+    # Parse logs for progress information
+    is_indexing = False
+    total_files = None
+    current_chunks = 0
+    
+    if logs_data and 'output' in logs_data:
+        # Check last 50 log entries for broader detection
+        recent_logs = logs_data['output'][-50:]
+        all_logs = logs_data['output']
+        
+        # Look for any recent insertion activity for this collection
+        for log_entry in recent_logs:
+            if f"📝 Inserting" in log_entry and expected_collection in log_entry:
+                is_indexing = True
+                break
+        
+        # Look for tracking count and completion info in all logs for this collection
+        for entry in all_logs:
+            if f"claude-codeindex-{project_name}" in entry:
+                # Parse total files being tracked
+                if "tracking" in entry:
+                    match = re.search(r'tracking (\d+) files', entry)
+                    if match:
+                        total_files = int(match.group(1))
+                
+                # Parse completion status  
+                if "✅ Initial index completed:" in entry:
+                    match = re.search(r'(\d+) files, (\d+) chunks', entry)
+                    if match:
+                        total_files = int(match.group(1))
+                        current_chunks = int(match.group(2))
+    
+    # If collection exists, get current document count
+    if current_collection:
+        try:
+            collection_result = subprocess.run(
+                ["curl", "-s", f"http://localhost:6333/collections/{expected_collection}"],
+                capture_output=True,
+                text=True,
+                timeout=1
+            )
+            if collection_result.returncode == 0:
+                collection_info = json.loads(collection_result.stdout)
+                current_chunks = collection_info.get('result', {}).get('points_count', current_chunks)
+        except:
+            pass
+    
+    # Determine status
+    if current_collection:
+        if is_indexing and total_files and current_chunks:
+            # Calculate rough progress (chunks vs estimated total chunks)
+            # Estimate ~100 chunks per file on average
+            estimated_total_chunks = total_files * 100
+            progress_pct = min(100, int((current_chunks / estimated_total_chunks) * 100))
+            return f"🔄 {project_name} ({progress_pct}%)"
+        else:
+            return f"✅ {project_name}"
+    else:
+        # Check if there are any codeindex collections (service is working)
+        has_any_codeindex = any(
+            col.get('name', '').startswith('claude-codeindex-') 
+            for col in collections
+        )
+        
+        if has_any_codeindex:
+            return f"❌ {project_name}"
+        else:
+            return "idle"
+
+def parse_codeindex_collections(data):
+    """Parse Qdrant collections response to show current project status"""
+    if not data or 'result' not in data or 'collections' not in data['result']:
+        return "❌ service down"
+    
+    # Get current working directory to check if current project is indexed
+    cwd = get_current_working_directory()
+    if not cwd:
+        return "❓ unknown dir"
+    
+    # Extract project name from current directory
+    project_name = cwd.split('/')[-1]
+    expected_collection = f"claude-codeindex-{project_name}"
+    
+    # Check if current project has a collection
+    collections = data['result']['collections']
+    for collection in collections:
+        if collection.get('name', '') == expected_collection:
+            return f"✅ {project_name}"
+    
+    # Check if there are any codeindex collections (service is working)
+    has_any_codeindex = any(
+        col.get('name', '').startswith('claude-codeindex-') 
+        for col in collections
+    )
+    
+    if has_any_codeindex:
+        return f"❌ {project_name}"
+    else:
+        return "idle"
+
+def parse_codeindex_data(data):
+    """Parse codeindex status into display format"""
+    if not data or data.get('status') != 'running':
+        return "idle"
+    
+    directory = data.get('directory', '')
+    if not directory:
+        return "idle"
+    
+    # Extract project name from directory path
+    project_name = directory.split('/')[-1]
+    
+    # Determine status indicator
+    errors = data.get('stats', {}).get('errors', 0)
+    if errors > 0:
+        indicator = "⚠️"
+    else:
+        indicator = "●"
+    
+    return f"{indicator}{project_name}"
+
+def format_codeindex_status():
+    """Format codeindex status for status line (optional)"""
+    status = get_codeindex_status()
+    if status is None:
+        return None  # Service unavailable, skip section
+    return f"🔍 {status}"
 
 def calculate_status(claude_data=None):
     """Calculate the status line values"""
@@ -206,20 +402,32 @@ def calculate_status(claude_data=None):
     
     # If no model from stdin, try to detect from recent block models
     elif current_block and 'models' in current_block and current_block['models']:
-        # Get most recent non-synthetic model
+        # Get all non-synthetic models and parse them
+        model_names = []
+        seen_models = set()
+        
         for model_id in reversed(current_block['models']):
             if model_id != '<synthetic>':
+                parsed_model = None
                 if 'opus-4-1' in model_id:
-                    model = "Opus 4.1"
+                    parsed_model = "Opus 4.1"
                 elif 'opus-4' in model_id:
-                    model = "Opus 4"
+                    parsed_model = "Opus 4"
                 elif 'sonnet-4' in model_id:
-                    model = "Sonnet 4"
+                    parsed_model = "Sonnet 4"
                 elif 'sonnet-3' in model_id:
-                    model = "Sonnet 3.5"
+                    parsed_model = "Sonnet 3.5"
                 elif 'haiku' in model_id:
-                    model = "Haiku"
-                break
+                    parsed_model = "Haiku"
+                
+                # Add to list if we parsed it and haven't seen it before
+                if parsed_model and parsed_model not in seen_models:
+                    model_names.append(parsed_model)
+                    seen_models.add(parsed_model)
+        
+        # Join models with commas if multiple, otherwise use single model
+        if model_names:
+            model = ", ".join(model_names)
     
     # Format costs
     session_str = f"${session_cost:.2f}" if session_found else "N/A"
@@ -230,15 +438,24 @@ def calculate_status(claude_data=None):
     display_tokens = block_tokens
     tokens_str = format_number(display_tokens)
     
-    # Build status line
+    # Build status line parts
     status_parts = [
-        f"🤖 {model}",
+        f"🤖 {model}"
+    ]
+    
+    # Add codeindex status if available (optional dependency)
+    codeindex_status = format_codeindex_status()
+    if codeindex_status:
+        status_parts.append(codeindex_status)
+    
+    # Continue with existing parts
+    status_parts.extend([
         f"💰 {session_str} session / {today_str} today / {block_str} block ({time_remaining} left)",
         f"🔥 {burn_str}",
-        f"{tokens_str} tokens",
+        f"{tokens_str} tokens", 
         f"{block_usage_pct:.1f}% used",
         f"{time_left} left"
-    ]
+    ])
     
     return " | ".join(status_parts)
 
