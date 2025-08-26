@@ -1,6 +1,6 @@
 # Claude Code Enhanced Statusline
 
-Enhanced statusline for Claude Code that provides accurate token usage, costs, burn rate metrics, and optional codeindex integration.
+Enhanced statusline for Claude Code that provides accurate token usage, costs, burn rate metrics, and optional codeindex integration. Compatible with all Claude Code versions including v1.0.92+.
 
 ## ✨ Features
 
@@ -10,6 +10,19 @@ Enhanced statusline for Claude Code that provides accurate token usage, costs, b
 - ⏱️ **Time remaining** - Precise time left in current billing block
 - 🎯 **Session detection** - Automatic detection of current project session
 - 🔍 **Codeindex integration** (optional) - Show active codebase indexing status
+- ⚠️ **Context limit warnings** - Visual indicator when exceeding 200k tokens
+- 🤖 **Multiple model display** - Shows comma-separated model names when using multiple models
+
+## 🔄 Version Compatibility
+
+This project provides **two statusline scripts** for different Claude Code versions:
+
+| Claude Code Version | Script | Features |
+|---------------------|--------|----------|
+| **v1.0.92+** (Latest) | `claude-statusline-v1092.py` | ✅ Full v1.0.92+ JSON support<br>✅ Context limit warnings<br>✅ Enhanced error handling<br>✅ Multiple model display<br>✅ All cost tracking features |
+| **v1.0.88 and earlier** | `claude-statusline.py` | ✅ Legacy JSON support<br>✅ Basic cost tracking<br>✅ Codeindex integration<br>❌ No context warnings |
+
+**The installer automatically selects the correct script** for your Claude Code version. For v1.0.92+, it uses the enhanced v1092 script.
 
 ## 📋 Prerequisites
 
@@ -73,6 +86,16 @@ The statusline will automatically update in Claude Code.
 🤖 Opus 4.1 | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
 ```
 
+**With multiple models** (v1.0.92+):
+```
+🤖 Opus 4.1, Sonnet 4 | 💰 $99.52 session / $52.95 today / $78.06 block (1h 40m left) | 🔥 482K/min | 96.5M tokens | 98.8% used | ~1h40m left
+```
+
+**With context limit warning** (v1.0.92+):
+```
+🤖 Opus 4.1 ⚠️ Context limit | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
+```
+
 **With codeindex integration** (when available):
 ```
 🤖 Opus 4.1 | 🔍 ✅ claude-codeindex | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
@@ -110,9 +133,11 @@ The statusline will automatically update in Claude Code.
 
 ## 🛠️ Manual Installation
 
-1. Copy the statusline script:
+### For Claude Code v1.0.92+ (Recommended)
+
+1. Copy the v1092 statusline script:
    ```bash
-   cp claude-statusline.py ~/.claude/claude-statusline.py
+   cp claude-statusline-v1092.py ~/.claude/claude-statusline.py
    chmod +x ~/.claude/claude-statusline.py
    ```
 
@@ -125,6 +150,18 @@ The statusline will automatically update in Claude Code.
      }
    }
    ```
+
+### For Claude Code v1.0.88 and Earlier
+
+1. Copy the legacy statusline script:
+   ```bash
+   cp claude-statusline.py ~/.claude/claude-statusline.py
+   chmod +x ~/.claude/claude-statusline.py
+   ```
+
+2. Update `~/.claude/settings.json` (same as above)
+
+> **Note**: The automatic installer detects your Claude Code version and selects the appropriate script. Manual installation is only needed for custom setups.
 
 ## 🧪 Testing
 
@@ -187,11 +224,38 @@ The statusline monitors codeindex logs for active indexing operations:
 
 ## 📝 Technical Details
 
-The script:
-1. Queries `ccusage` for session, daily, and block metrics
-2. Parses JSON output and calculates accurate percentages
-3. Formats output optimized for terminal display
-4. Returns formatted statusline to Claude Code
+### How It Works
+
+Both scripts follow the same core process:
+1. Query `ccusage` for session, daily, and block metrics
+2. Parse JSON output and calculate accurate percentages  
+3. Format output optimized for terminal display
+4. Return formatted statusline to Claude Code
+
+### Version-Specific Differences
+
+**claude-statusline-v1092.py (v1.0.92+):**
+- Enhanced JSON input parsing for new Claude Code format
+- Supports `workspace.current_dir` and `cost.total_cost_usd` fields
+- Detects `exceeds_200k_tokens` for context limit warnings
+- Improved block detection logic (active blocks + recent non-gap blocks)
+- Longer ccusage timeouts (10s vs 3s) to prevent command failures
+- Enhanced model detection with `display_name` field support
+- Robust error handling with graceful fallbacks
+
+**claude-statusline.py (Legacy):**
+- Original JSON input format support
+- Basic cost tracking and codeindex integration
+- Shorter timeouts suitable for older ccusage versions
+- Simpler error handling
+
+### Cost Tracking Algorithm
+
+The statusline uses a sophisticated cost tracking system:
+1. **Session costs**: Matches current directory to ccusage session data
+2. **Daily costs**: Aggregates today's usage across all sessions  
+3. **Block costs**: Uses most recent active or non-gap block
+4. **Time estimates**: Based on current burn rate and remaining block limit
 
 ## 🐞 Troubleshooting
 
@@ -218,6 +282,23 @@ The script:
 - Normal for large projects - indexing pauses between file batches
 - Check activity: `curl -s http://localhost:3847/logs`
 - Progress updates when new files are inserted
+
+**Cost tracking shows $0.00 for all values**
+- You may be using the wrong script for your Claude Code version
+- For v1.0.92+, use `claude-statusline-v1092.py`
+- For v1.0.88 and earlier, use `claude-statusline.py`
+- ccusage commands may be timing out - the v1092 script has longer timeouts
+- Run the installer again to auto-detect your version
+
+**Context warning not showing (v1.0.92+)**
+- Ensure you're using `claude-statusline-v1092.py`
+- Context warnings only appear when exceeding 200k tokens
+- Feature is only available in Claude Code v1.0.88+
+
+**Multiple models not displaying correctly**
+- Ensure you're using `claude-statusline-v1092.py` for v1.0.92+
+- Legacy script may not properly handle multiple models
+- Models should appear comma-separated: "Opus 4.1, Sonnet 4"
 
 ## 📄 License
 
