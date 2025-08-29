@@ -79,9 +79,6 @@ def get_codeindex_status():
         if not cwd:
             return None
         
-        project_name = cwd.split('/')[-1]
-        expected_collection = f"claude-codeindex-{project_name}"
-        
         # Check collections with shorter timeout
         collections_result = subprocess.run(
             ["curl", "-s", "--max-time", "1", "http://localhost:6333/collections"],
@@ -95,20 +92,33 @@ def get_codeindex_status():
                 collections_data = json.loads(collections_result.stdout)
                 if 'result' in collections_data and 'collections' in collections_data['result']:
                     collections = collections_data['result']['collections']
+                    collection_names = [col.get('name', '') for col in collections]
                     
-                    # Check if current project has a collection
-                    for collection in collections:
-                        if collection.get('name', '') == expected_collection:
-                            return f"✅ {project_name}"
+                    # Walk up directory tree to find indexed parent projects
+                    path_parts = cwd.rstrip('/').split('/')
+                    for i in range(len(path_parts), 0, -1):
+                        # Get directory name at this level
+                        dir_name = path_parts[i-1]
+                        expected_collection = f"claude-codeindex-{dir_name}"
+                        
+                        # Check if this directory level has a collection
+                        if expected_collection in collection_names:
+                            return f"✅ {dir_name}"
+                        
+                        # Stop at reasonable boundaries (home directory, etc.)
+                        if dir_name in ['Users', 'home', 'root'] or len(path_parts[:i]) < 3:
+                            break
                     
-                    # Check if any codeindex collections exist
+                    # Check if any codeindex collections exist at all
                     has_any_codeindex = any(
-                        col.get('name', '').startswith('claude-codeindex-') 
-                        for col in collections
+                        name.startswith('claude-codeindex-') 
+                        for name in collection_names
                     )
                     
                     if has_any_codeindex:
-                        return f"❌ {project_name}"
+                        # Use the immediate directory name for "not indexed" status
+                        current_dir = cwd.split('/')[-1]
+                        return f"❌ {current_dir}"
                     else:
                         return "idle"
             except (json.JSONDecodeError, KeyError):

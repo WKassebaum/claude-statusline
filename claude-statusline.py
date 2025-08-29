@@ -115,7 +115,7 @@ def get_codeindex_status():
             except (json.JSONDecodeError, ValueError):
                 logs_data = None  # Continue without logs
         
-        result = parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection)
+        result = parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection, cwd)
         
         # Validate result before returning
         if result and isinstance(result, str) and len(result) > 0:
@@ -144,22 +144,49 @@ def get_codeindex_status():
         except Exception:
             return None
 
-def parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection):
-    """Parse codeindex status with progress tracking"""
+def parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection, cwd):
+    """Parse codeindex status with progress tracking and parent directory support"""
     if not collections_data or 'result' not in collections_data:
         return None  # Return None when service is unreachable
     
     try:
         collections = collections_data['result']['collections']
+        collection_names = [col.get('name', '') for col in collections]
     except (KeyError, TypeError):
         return None  # Return None on data structure errors
     
-    # Check if current project has a collection
+    # Walk up directory tree to find indexed parent projects
     current_collection = None
-    for collection in collections:
-        if collection.get('name', '') == expected_collection:
-            current_collection = collection
+    matched_project_name = None
+    
+    path_parts = cwd.rstrip('/').split('/')
+    for i in range(len(path_parts), 0, -1):
+        # Get directory name at this level
+        dir_name = path_parts[i-1]
+        expected_coll = f"claude-codeindex-{dir_name}"
+        
+        # Check if this directory level has a collection
+        if expected_coll in collection_names:
+            # Find the actual collection object
+            for collection in collections:
+                if collection.get('name', '') == expected_coll:
+                    current_collection = collection
+                    matched_project_name = dir_name
+                    break
+            if current_collection:
+                break
+        
+        # Stop at reasonable boundaries (home directory, etc.)
+        if dir_name in ['Users', 'home', 'root'] or len(path_parts[:i]) < 3:
             break
+    
+    # If we didn't find a match, fall back to original behavior
+    if not current_collection:
+        for collection in collections:
+            if collection.get('name', '') == expected_collection:
+                current_collection = collection
+                matched_project_name = project_name
+                break
     
     # Parse logs for progress information
     is_indexing = False
@@ -178,20 +205,21 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
                 break
         
         # Look for tracking count and completion info in all logs for this collection
-        for entry in all_logs:
-            if f"claude-codeindex-{project_name}" in entry:
-                # Parse total files being tracked
-                if "tracking" in entry:
-                    match = re.search(r'tracking (\d+) files', entry)
-                    if match:
-                        total_files = int(match.group(1))
-                
-                # Parse completion status  
-                if "✅ Initial index completed:" in entry:
-                    match = re.search(r'(\d+) files, (\d+) chunks', entry)
-                    if match:
-                        total_files = int(match.group(1))
-                        current_chunks = int(match.group(2))
+        if matched_project_name:
+            for entry in all_logs:
+                if f"claude-codeindex-{matched_project_name}" in entry:
+                    # Parse total files being tracked
+                    if "tracking" in entry:
+                        match = re.search(r'tracking (\d+) files', entry)
+                        if match:
+                            total_files = int(match.group(1))
+                    
+                    # Parse completion status  
+                    if "✅ Initial index completed:" in entry:
+                        match = re.search(r'(\d+) files, (\d+) chunks', entry)
+                        if match:
+                            total_files = int(match.group(1))
+                            current_chunks = int(match.group(2))
     
     # If collection exists, get current document count
     if current_collection:
@@ -210,14 +238,16 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
     
     # Determine status
     if current_collection:
+        # Use the matched project name (could be a parent directory)
+        display_name = matched_project_name or project_name
         if is_indexing and total_files and current_chunks:
             # Calculate rough progress (chunks vs estimated total chunks)
             # Estimate ~100 chunks per file on average
             estimated_total_chunks = total_files * 100
             progress_pct = min(100, int((current_chunks / estimated_total_chunks) * 100))
-            return f"🔄 {project_name} ({progress_pct}%)"
+            return f"🔄 ({progress_pct}%) {display_name}"
         else:
-            return f"✅ {project_name}"
+            return f"✅ {display_name}"
     else:
         # Check if there are any codeindex collections (service is working)
         has_any_codeindex = any(
@@ -226,6 +256,7 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
         )
         
         if has_any_codeindex:
+            # Use immediate directory name for "not indexed" status
             return f"❌ {project_name}"
         else:
             return "idle"
