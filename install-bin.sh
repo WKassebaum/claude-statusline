@@ -54,12 +54,43 @@ if [ ! -d "$CLAUDE_DIR" ]; then
     mkdir -p "$CLAUDE_DIR"
 fi
 
-# Copy the statusline script
+# Detect Claude Code version and choose appropriate script
+CLAUDE_VERSION=""
+if command -v claude &> /dev/null; then
+    CLAUDE_VERSION=$(claude --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+    echo -e "${GREEN}✓${NC} Claude Code version: $CLAUDE_VERSION"
+else
+    echo -e "${YELLOW}⚠${NC} Could not detect Claude Code version, defaulting to legacy script"
+fi
+
+# Choose the appropriate script based on version
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SOURCE_SCRIPT="claude-statusline.py"  # Default to legacy
+
+if [ -n "$CLAUDE_VERSION" ]; then
+    # Parse version numbers for comparison
+    IFS='.' read -r major minor patch <<< "$CLAUDE_VERSION"
+    
+    # Use v1092 script for version 1.0.92 and later
+    if [ "$major" -gt 1 ] || ([ "$major" -eq 1 ] && [ "$minor" -gt 0 ]) || ([ "$major" -eq 1 ] && [ "$minor" -eq 0 ] && [ "$patch" -ge 92 ]); then
+        SOURCE_SCRIPT="claude-statusline-v1092.py"
+        echo -e "${BLUE}→${NC} Using enhanced v1.0.92+ compatible script"
+    else
+        echo -e "${BLUE}→${NC} Using legacy script for v1.0.88 and earlier"
+    fi
+fi
+
 STATUSLINE_SCRIPT="$LOCAL_BIN/claude-statusline"
 
-echo -e "${YELLOW}→${NC} Installing statusline script to ~/.local/bin..."
-cp "$SCRIPT_DIR/claude-statusline.py" "$STATUSLINE_SCRIPT"
+echo -e "${YELLOW}→${NC} Installing statusline script ($SOURCE_SCRIPT) to ~/.local/bin..."
+if [ ! -f "$SCRIPT_DIR/$SOURCE_SCRIPT" ]; then
+    echo -e "${RED}❌ Error: $SOURCE_SCRIPT not found${NC}"
+    echo "Available scripts in $SCRIPT_DIR:"
+    ls -la "$SCRIPT_DIR"/*.py 2>/dev/null || echo "No Python scripts found"
+    exit 1
+fi
+
+cp "$SCRIPT_DIR/$SOURCE_SCRIPT" "$STATUSLINE_SCRIPT"
 chmod +x "$STATUSLINE_SCRIPT"
 echo -e "${GREEN}✓${NC} Statusline script installed to $STATUSLINE_SCRIPT"
 
