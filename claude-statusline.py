@@ -357,12 +357,16 @@ def calculate_status(claude_data=None):
             
             # Get burn rate
             if 'burnRate' in current_block:
-                burn_rate = int(current_block['burnRate'].get('tokensPerMinute', 0))
-                hourly_rate = current_block['burnRate'].get('costPerHour', 0.0)
+                burn_rate_info = current_block['burnRate']
+                if isinstance(burn_rate_info, dict):
+                    burn_rate = int(burn_rate_info.get('tokensPerMinute', 0))
+                    hourly_rate = burn_rate_info.get('costPerHour', 0.0)
             
             # Get remaining time
             if 'projection' in current_block:
-                time_remaining_mins = current_block['projection'].get('remainingMinutes', 0)
+                projection_info = current_block['projection']
+                if isinstance(projection_info, dict):
+                    time_remaining_mins = projection_info.get('remainingMinutes', 0)
             
             # Calculate usage percentage (based on 97.6M token limit for 5 hour block)
             block_limit = 97_675_753  # Standard 5-hour block limit
