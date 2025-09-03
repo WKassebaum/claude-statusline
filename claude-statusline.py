@@ -25,6 +25,105 @@ def format_number(num):
     else:
         return str(num)
 
+def get_model_context_limit(model_id, claude_data=None):
+    """Get context window limit for Claude model with dynamic detection"""
+    if not model_id:
+        return 200000  # Default to 200k
+    
+    # First try to get actual limit from Claude Code JSON if available
+    if claude_data:
+        # Check if Claude Code provides the context limit directly
+        if 'context_limit' in claude_data:
+            return claude_data['context_limit']
+        elif 'model' in claude_data and isinstance(claude_data['model'], dict):
+            model_info = claude_data['model']
+            if 'context_limit' in model_info:
+                return model_info['context_limit']
+            elif 'max_tokens' in model_info:
+                return model_info['max_tokens']
+    
+    # Enhanced Claude model context limits (as of 2025)
+    model_id_lower = model_id.lower()
+    
+    # Claude 4.x models (latest generation)
+    if 'claude-4' in model_id_lower or 'opus-4' in model_id_lower:
+        if 'opus' in model_id_lower:
+            return 200000  # Claude 4 Opus: 200k tokens
+        elif 'sonnet' in model_id_lower:
+            return 200000  # Claude 4 Sonnet: 200k tokens
+        elif 'haiku' in model_id_lower:
+            return 200000  # Claude 4 Haiku: 200k tokens
+    
+    # Claude 3.x models 
+    elif 'claude-3' in model_id_lower:
+        if 'opus' in model_id_lower:
+            return 200000  # Claude 3 Opus: 200k tokens
+        elif 'sonnet-3.5' in model_id_lower or 'sonnet-4-' in model_id_lower:
+            return 200000  # Claude 3.5 Sonnet: 200k tokens
+        elif 'sonnet' in model_id_lower:
+            return 200000  # Claude 3 Sonnet: 200k tokens  
+        elif 'haiku' in model_id_lower:
+            return 200000  # Claude 3 Haiku: 200k tokens
+    
+    # Generic fallbacks based on model family
+    elif 'opus' in model_id_lower:
+        return 200000  # Opus models generally: 200k tokens
+    elif 'sonnet' in model_id_lower:
+        return 200000  # Sonnet models generally: 200k tokens
+    elif 'haiku' in model_id_lower:
+        return 200000  # Haiku models generally: 200k tokens
+    
+    # Future-proof default - if context limits increase, this will be conservative
+    return 200000  # Default for unknown models
+
+def get_context_usage(claude_data):
+    """Extract context usage information from Claude Code JSON"""
+    try:
+        context_tokens = 0
+        context_limit = 200000  # Default
+        
+        # Get model info for context limit (pass claude_data for dynamic detection)
+        if 'model' in claude_data:
+            model_id = claude_data['model'].get('id', '') if isinstance(claude_data['model'], dict) else str(claude_data['model'])
+            context_limit = get_model_context_limit(model_id, claude_data)
+        
+        # Try to get current context usage from various possible fields
+        # Claude Code might provide this in different ways
+        if 'context' in claude_data:
+            if isinstance(claude_data['context'], dict):
+                context_tokens = claude_data['context'].get('tokens_used', 0)
+            else:
+                context_tokens = claude_data['context']
+        elif 'tokens' in claude_data:
+            if isinstance(claude_data['tokens'], dict):
+                context_tokens = claude_data['tokens'].get('context', 0)
+            else:
+                context_tokens = claude_data['tokens']
+        elif 'session' in claude_data:
+            # Might be in session info
+            context_tokens = claude_data['session'].get('context_tokens', 0)
+        
+        # For legacy compatibility, don't show context if we have no data
+        return context_tokens, context_limit
+        
+    except Exception:
+        return 0, 200000  # Safe defaults
+
+def format_context_usage(context_tokens, context_limit):
+    """Format context usage for display"""
+    if context_tokens == 0:
+        return None  # Don't show if no data
+    
+    # Calculate percentage
+    percentage = min(100, int((context_tokens / context_limit) * 100)) if context_limit > 0 else 0
+    
+    # Format with appropriate units
+    tokens_str = format_number(context_tokens)
+    limit_str = format_number(context_limit)
+    
+    # Show as percentage and absolute
+    return f"📄 {percentage}% ({tokens_str}/{limit_str})"
+
 def get_ccusage_data():
     """Get usage data from ccusage tool"""
     try:
@@ -496,6 +595,10 @@ def calculate_status(claude_data=None):
     display_tokens = block_tokens
     tokens_str = format_number(display_tokens)
     
+    # Get context usage information  
+    context_tokens, context_limit = get_context_usage(claude_data)
+    context_usage_str = format_context_usage(context_tokens, context_limit)
+    
     # Build status line parts
     status_parts = [
         f"🤖 {model}"
@@ -505,6 +608,10 @@ def calculate_status(claude_data=None):
     codeindex_status = format_codeindex_status()
     if codeindex_status:
         status_parts.append(codeindex_status)
+    
+    # Add context usage if available  
+    if context_usage_str:
+        status_parts.append(context_usage_str)
     
     # Continue with existing parts
     status_parts.extend([
