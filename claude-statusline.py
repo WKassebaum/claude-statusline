@@ -335,6 +335,23 @@ def calculate_status(claude_data=None):
         claude_data = {}
     blocks_data, session_data, daily_data = get_ccusage_data()
     
+    # Check for real token metrics from OTLP proxy
+    real_tokens = None
+    metrics_file = os.path.expanduser('~/.claude/token-metrics.json')
+    if os.path.exists(metrics_file):
+        try:
+            with open(metrics_file, 'r') as f:
+                metrics_data = json.load(f)
+                # Only use metrics if they're recent (within last 60 seconds)
+                if 'timestamp' in metrics_data:
+                    from datetime import datetime
+                    metrics_time = datetime.fromisoformat(metrics_data['timestamp'])
+                    age_seconds = (datetime.now() - metrics_time).total_seconds()
+                    if age_seconds < 60:
+                        real_tokens = metrics_data.get('totalUsed', 0)
+        except:
+            pass
+    
     # Get current working directory
     cwd = get_current_working_directory()
     
@@ -498,9 +515,12 @@ def calculate_status(claude_data=None):
     today_str = f"${today_cost:.2f}"
     block_str = f"${block_cost:.2f}"
     
-    # Format token count - use block tokens for current usage
-    display_tokens = block_tokens
-    tokens_str = format_number(display_tokens)
+    # Format token count - use real tokens if available
+    if real_tokens is not None:
+        tokens_str = f"📊 {format_number(real_tokens)} tokens (actual)"
+    else:
+        display_tokens = block_tokens
+        tokens_str = f"{format_number(display_tokens)} tokens"
     
     
     # Build status line parts
