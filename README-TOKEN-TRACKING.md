@@ -11,7 +11,24 @@ Claude Code exposes actual token usage metrics through OpenTelemetry (OTLP). Thi
 
 ## Quick Start
 
-### Option 1: Use the Launch Script (Recommended)
+### Option 1: Automatic Setup via .zshrc (Recommended)
+The environment variables are now configured in your `.zshrc`:
+```bash
+# Token tracking is enabled by default
+# Start the proxy if needed:
+./start-token-proxy.sh
+
+# Then just run Claude normally:
+claude
+```
+
+To disable token tracking temporarily:
+```bash
+export CLAUDE_TOKEN_TRACKING=0
+claude
+```
+
+### Option 2: Use the Launch Script
 ```bash
 ./launch-claude-with-metrics.sh
 ```
@@ -20,20 +37,23 @@ This script:
 - Launches Claude Code with telemetry enabled
 - Cleans up when Claude Code exits
 
-### Option 2: Manual Setup
+### Option 3: Manual Setup
 1. Start the metrics proxy:
 ```bash
-python3 token-metrics-proxy.py &
+./start-token-proxy.sh
+# or manually: python3 token-metrics-proxy.py &
 ```
 
-2. Launch Claude Code with telemetry:
+2. Launch Claude Code (with env vars already set via .zshrc):
 ```bash
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_METRIC_EXPORT_INTERVAL=5000
 claude
 ```
+
+## Helper Scripts
+
+- **`start-token-proxy.sh`**: Starts the proxy if not already running
+- **`stop-token-proxy.sh`**: Stops the proxy cleanly
+- **`launch-claude-with-metrics.sh`**: All-in-one launcher
 
 ## What You'll See
 
