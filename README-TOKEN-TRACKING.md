@@ -1,7 +1,23 @@
 # Real Token Usage Tracking for Claude Code Statusline
 
+## ⚠️ CRITICAL SAFETY WARNING
+
+**Token tracking can crash Claude Code if misconfigured!**
+
+**Before enabling:**
+1. ✅ **Follow the testing protocol**: See `TESTING-PROTOCOL.md`
+2. ✅ **Test in isolation**: Never enable in your main working environment first
+3. ✅ **Have recovery plan**: Know how to disable quickly if issues occur
+
+**Known issues that cause crashes:**
+- Missing `OTEL_EXPORTER_OTLP_PROTOCOL=http/json` (critical!)
+- Malformed OTLP endpoint configuration
+- Environment variable pollution between sessions
+
 ## Overview
 Claude Code exposes actual token usage metrics through OpenTelemetry (OTLP). This feature allows the statusline to display real token consumption instead of estimates.
+
+**🚨 This feature is experimental and requires careful testing before production use.**
 
 ## How It Works
 
@@ -11,22 +27,39 @@ Claude Code exposes actual token usage metrics through OpenTelemetry (OTLP). Thi
 
 ## Quick Start
 
-### Option 1: Fully Automatic Setup (Recommended)
-With the latest `.zshrc` configuration:
+### ⚠️ REQUIRED: Follow Testing Protocol First
+**Do NOT skip this step:**
 ```bash
-# Just run Claude - the proxy auto-starts if needed!
-claude
+# 1. Read the testing protocol
+cat TESTING-PROTOCOL.md
+
+# 2. Run safety checks
+./claude-token-safe-test.sh
+
+# 3. Follow the step-by-step testing process
 ```
 
-That's it! The proxy will:
-- **Auto-start** when you open a terminal (if not already running)
-- **Persist** across all terminals and Claude sessions
-- **Only restart** after reboot
+### Option 1: Safe Configuration Approach (Recommended)
+Use the safer configuration script instead of direct .zshrc modification:
+```bash
+# Add to your .zshrc:
+export CLAUDE_TOKEN_TRACKING=1  # or 0 to disable
+source "$HOME/WorkDev/MCP-Dev/claude-statusline-fix/claude-token-config.sh"
+```
 
-To disable token tracking temporarily:
+### Option 2: Manual Testing (For Troubleshooting)
+```bash
+# In an isolated test terminal:
+export CLAUDE_TOKEN_TRACKING=1
+source ./claude-token-config.sh
+claude --version  # Test basic functionality
+```
+
+### Emergency Disable
+If Claude Code crashes or behaves strangely:
 ```bash
 export CLAUDE_TOKEN_TRACKING=0
-claude
+unset CLAUDE_CODE_ENABLE_TELEMETRY OTEL_METRICS_EXPORTER OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_PROTOCOL OTEL_METRIC_EXPORT_INTERVAL
 ```
 
 ### Option 2: Use the Launch Script
