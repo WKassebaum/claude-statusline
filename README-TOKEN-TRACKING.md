@@ -11,16 +11,17 @@ Claude Code exposes actual token usage metrics through OpenTelemetry (OTLP). Thi
 
 ## Quick Start
 
-### Option 1: Automatic Setup via .zshrc (Recommended)
-The environment variables are now configured in your `.zshrc`:
+### Option 1: Fully Automatic Setup (Recommended)
+With the latest `.zshrc` configuration:
 ```bash
-# Token tracking is enabled by default
-# Start the proxy if needed:
-./start-token-proxy.sh
-
-# Then just run Claude normally:
+# Just run Claude - the proxy auto-starts if needed!
 claude
 ```
+
+That's it! The proxy will:
+- **Auto-start** when you open a terminal (if not already running)
+- **Persist** across all terminals and Claude sessions
+- **Only restart** after reboot
 
 To disable token tracking temporarily:
 ```bash
@@ -98,6 +99,28 @@ Falls back to ccusage estimates when real metrics aren't available.
 - Metrics are cumulative for the session
 - Proxy handles metric aggregation and persistence
 - Statusline reads metrics file with freshness check
+
+## Setup for .zshrc Auto-Start
+
+Add this to your `.zshrc` for fully automatic token tracking:
+
+```bash
+## Claude Code Token Tracking (OpenTelemetry)
+export CLAUDE_TOKEN_TRACKING=1
+if [[ "$CLAUDE_TOKEN_TRACKING" == "1" ]]; then
+  export CLAUDE_CODE_ENABLE_TELEMETRY=1
+  export OTEL_METRICS_EXPORTER=otlp
+  export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+  export OTEL_METRIC_EXPORT_INTERVAL=5000
+  
+  # Auto-start token proxy if not running (silent check)
+  if ! lsof -i :4318 >/dev/null 2>&1; then
+    if [ -f "$HOME/WorkDev/MCP-Dev/claude-statusline-fix/start-token-proxy.sh" ]; then
+      ($HOME/WorkDev/MCP-Dev/claude-statusline-fix/start-token-proxy.sh >/dev/null 2>&1 &)
+    fi
+  fi
+fi
+```
 
 ## Limitations
 
