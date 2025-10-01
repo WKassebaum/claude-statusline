@@ -57,8 +57,8 @@ npm install -g ccusage
 
 ```bash
 # Clone the repository
-git clone https://github.com/WKassebaum/claude-statusline-fix.git
-cd claude-statusline-fix
+git clone https://github.com/WKassebaum/claude-statusline.git
+cd claude-statusline
 
 # Run the installer
 ./install.sh
@@ -70,8 +70,8 @@ Installs to `~/.local/bin` for system-wide access:
 
 ```bash
 # Clone the repository
-git clone https://github.com/WKassebaum/claude-statusline-fix.git
-cd claude-statusline-fix
+git clone https://github.com/WKassebaum/claude-statusline.git
+cd claude-statusline
 
 # Run the binary installer
 ./install-bin.sh

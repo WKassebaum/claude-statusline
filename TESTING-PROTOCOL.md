@@ -32,7 +32,7 @@ claude --help
 1. **Open a NEW terminal** (dedicated for testing)
 2. **Run pre-flight checks:**
    ```bash
-   cd /path/to/claude-statusline-fix
+   cd /path/to/claude-statusline
    ./claude-token-safe-test.sh
    ```
 3. **Wait for ✅ Pre-flight checks passed!**
@@ -96,7 +96,7 @@ claude --help
 1. **Update your .zshrc safely:**
    ```bash
    # Option A: Use the safer config sourcing approach
-   echo 'source "$HOME/WorkDev/MCP-Dev/claude-statusline-fix/claude-token-config.sh"' >> ~/.zshrc
+   echo 'source "$HOME/WorkDev/MCP-Dev/claude-statusline/claude-token-config.sh"' >> ~/.zshrc
    
    # Option B: Modify CLAUDE_TOKEN_TRACKING variable
    sed -i '' 's/export CLAUDE_TOKEN_TRACKING=0/export CLAUDE_TOKEN_TRACKING=1/' ~/.zshrc

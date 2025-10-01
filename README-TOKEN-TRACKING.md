@@ -44,7 +44,7 @@ Use the safer configuration script instead of direct .zshrc modification:
 ```bash
 # Add to your .zshrc:
 export CLAUDE_TOKEN_TRACKING=1  # or 0 to disable
-source "$HOME/WorkDev/MCP-Dev/claude-statusline-fix/claude-token-config.sh"
+source "$HOME/WorkDev/MCP-Dev/claude-statusline/claude-token-config.sh"
 ```
 
 ### Option 2: Manual Testing (For Troubleshooting)
@@ -148,8 +148,8 @@ if [[ "$CLAUDE_TOKEN_TRACKING" == "1" ]]; then
   
   # Auto-start token proxy if not running (silent check)
   if ! lsof -i :4318 >/dev/null 2>&1; then
-    if [ -f "$HOME/WorkDev/MCP-Dev/claude-statusline-fix/start-token-proxy.sh" ]; then
-      ($HOME/WorkDev/MCP-Dev/claude-statusline-fix/start-token-proxy.sh >/dev/null 2>&1 &)
+    if [ -f "$HOME/WorkDev/MCP-Dev/claude-statusline/start-token-proxy.sh" ]; then
+      ($HOME/WorkDev/MCP-Dev/claude-statusline/start-token-proxy.sh >/dev/null 2>&1 &)
     fi
   fi
 fi

@@ -24,7 +24,7 @@ validate_token_config() {
     fi
     
     # Check if proxy script exists
-    local proxy_script="$HOME/WorkDev/MCP-Dev/claude-statusline-fix/token-metrics-proxy.py"
+    local proxy_script="$HOME/WorkDev/MCP-Dev/claude-statusline/token-metrics-proxy.py"
     if [ ! -f "$proxy_script" ]; then
         echo "❌ ERROR: Token proxy script not found at $proxy_script"
         ((errors++))
@@ -57,7 +57,7 @@ export OTEL_METRIC_EXPORT_INTERVAL=5000
 
 # Start proxy if not running (but don't auto-restart Claude if it fails)
 if ! pgrep -f "token-metrics-proxy.py" >/dev/null; then
-    local proxy_script="$HOME/WorkDev/MCP-Dev/claude-statusline-fix/token-metrics-proxy.py"
+    local proxy_script="$HOME/WorkDev/MCP-Dev/claude-statusline/token-metrics-proxy.py"
     if [ -f "$proxy_script" ]; then
         # Start proxy but capture any errors
         if python3 "$proxy_script" >/dev/null 2>&1 &; then
