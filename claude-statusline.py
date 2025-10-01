@@ -344,7 +344,6 @@ def calculate_status(claude_data=None):
                 metrics_data = json.load(f)
                 # Only use metrics if they're recent (within last 60 seconds)
                 if 'timestamp' in metrics_data:
-                    from datetime import datetime
                     metrics_time = datetime.fromisoformat(metrics_data['timestamp'])
                     age_seconds = (datetime.now() - metrics_time).total_seconds()
                     if age_seconds < 60:
@@ -469,6 +468,8 @@ def calculate_status(claude_data=None):
                 model = "Opus 4.1"
             elif 'opus-4' in model_id_lower:
                 model = "Opus 4"
+            elif 'sonnet-4-5' in model_id_lower:
+                model = "Sonnet 4.5"
             elif 'sonnet-4' in model_id_lower:
                 model = "Sonnet 4"
             elif 'sonnet-3-5' in model_id_lower or 'sonnet-20241022' in model_id_lower:
@@ -494,6 +495,8 @@ def calculate_status(claude_data=None):
                     parsed_model = "Opus 4.1"
                 elif 'opus-4' in model_id:
                     parsed_model = "Opus 4"
+                elif 'sonnet-4-5' in model_id:
+                    parsed_model = "Sonnet 4.5"
                 elif 'sonnet-4' in model_id:
                     parsed_model = "Sonnet 4"
                 elif 'sonnet-3' in model_id:
