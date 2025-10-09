@@ -84,7 +84,7 @@ def get_codeindex_status():
             return None  # Return None instead of error string
         
         project_name = cwd.split('/')[-1]
-        expected_collection = f"claude-codeindex-{project_name}"
+        expected_collection = f"codeindex-{project_name}"
         
         # Check collections and logs in parallel
         collections_result = subprocess.run(
@@ -165,7 +165,7 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
     for i in range(len(path_parts), 0, -1):
         # Get directory name at this level
         dir_name = path_parts[i-1]
-        expected_coll = f"claude-codeindex-{dir_name}"
+        expected_coll = f"codeindex-{dir_name}"
         
         # Check if this directory level has a collection
         if expected_coll in collection_names:
@@ -205,11 +205,11 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
             if f"📝 Inserting" in log_entry and expected_collection in log_entry:
                 is_indexing = True
                 break
-        
+
         # Look for tracking count and completion info in all logs for this collection
         if matched_project_name:
             for entry in all_logs:
-                if f"claude-codeindex-{matched_project_name}" in entry:
+                if f"codeindex-{matched_project_name}" in entry:
                     # Parse total files being tracked
                     if "tracking" in entry:
                         match = re.search(r'tracking (\d+) files', entry)
@@ -253,7 +253,7 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
     else:
         # Check if there are any codeindex collections (service is working)
         has_any_codeindex = any(
-            col.get('name', '').startswith('claude-codeindex-') 
+            col.get('name', '').startswith('codeindex-')
             for col in collections
         )
         
@@ -275,7 +275,7 @@ def parse_codeindex_collections(data):
     
     # Extract project name from current directory
     project_name = cwd.split('/')[-1]
-    expected_collection = f"claude-codeindex-{project_name}"
+    expected_collection = f"codeindex-{project_name}"
     
     # Check if current project has a collection
     collections = data['result']['collections']
@@ -285,7 +285,7 @@ def parse_codeindex_collections(data):
     
     # Check if there are any codeindex collections (service is working)
     has_any_codeindex = any(
-        col.get('name', '').startswith('claude-codeindex-') 
+        col.get('name', '').startswith('codeindex-')
         for col in collections
     )
     
