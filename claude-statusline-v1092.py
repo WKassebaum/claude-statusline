@@ -100,19 +100,19 @@ def get_codeindex_status():
                     for i in range(len(path_parts), 0, -1):
                         # Get directory name at this level
                         dir_name = path_parts[i-1]
-                        expected_collection = f"claude-codeindex-{dir_name}"
-                        
+                        expected_collection = f"codeindex-{dir_name}"
+
                         # Check if this directory level has a collection
                         if expected_collection in collection_names:
                             return f"✅ {dir_name}"
-                        
+
                         # Stop at reasonable boundaries (home directory, etc.)
                         if dir_name in ['Users', 'home', 'root'] or len(path_parts[:i]) < 3:
                             break
-                    
+
                     # Check if any codeindex collections exist at all
                     has_any_codeindex = any(
-                        name.startswith('claude-codeindex-') 
+                        name.startswith('codeindex-')
                         for name in collection_names
                     )
                     
@@ -158,7 +158,6 @@ def calculate_status(claude_data=None):
                 metrics_data = json.load(f)
                 # Only use metrics if they're recent (within last 60 seconds)
                 if 'timestamp' in metrics_data:
-                    from datetime import datetime
                     metrics_time = datetime.fromisoformat(metrics_data['timestamp'])
                     age_seconds = (datetime.now() - metrics_time).total_seconds()
                     if age_seconds < 60:
@@ -385,7 +384,7 @@ def calculate_status(claude_data=None):
     status_parts.extend([
         f"💰 {session_str} session / {today_str} today / {block_str} block ({time_remaining} left)",
         f"🔥 {burn_str}",
-        f"{tokens_str} tokens", 
+        tokens_str,
         f"{block_usage_pct:.1f}% used",
         f"{time_left} left"
     ])
