@@ -100,7 +100,8 @@ def get_codeindex_status():
                     for i in range(len(path_parts), 0, -1):
                         # Get directory name at this level
                         dir_name = path_parts[i-1]
-                        expected_collection = f"codeindex-{dir_name}"
+                        # Lowercase to match codeindex naming (context.ts:1140)
+                        expected_collection = f"codeindex-{dir_name}".lower()
 
                         # Check if this directory level has a collection
                         if expected_collection in collection_names:
