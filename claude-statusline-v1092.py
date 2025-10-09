@@ -72,6 +72,27 @@ def get_current_working_directory():
     except:
         return None
 
+def get_git_branch():
+    """Get current git branch with robust error handling"""
+    try:
+        cwd = get_current_working_directory()
+        if not cwd:
+            return None
+
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            timeout=0.5,
+            cwd=cwd
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return None
+    except:
+        return None
+
 def get_codeindex_status():
     """Get codeindex status with robust error handling"""
     try:
@@ -374,7 +395,12 @@ def calculate_status(claude_data=None):
     status_parts = [
         f"🤖 {model}{context_warning}"
     ]
-    
+
+    # Add git branch if available
+    git_branch = get_git_branch()
+    if git_branch:
+        status_parts.append(f"🌿 {git_branch}")
+
     # Add codeindex status if available
     codeindex_status = format_codeindex_status()
     if codeindex_status:
