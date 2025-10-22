@@ -339,6 +339,8 @@ def calculate_status(claude_data=None):
     real_tokens = None
     context_window_tokens = None
     context_usage_percent = None
+    claude_session_cost = None
+    exceeds_context_limit = False
 
     if 'context' in claude_data:
         context_data = claude_data['context']
@@ -350,6 +352,14 @@ def calculate_status(claude_data=None):
     if 'model' in claude_data and isinstance(claude_data['model'], dict):
         # Get context window size from model info
         context_window_tokens = claude_data['model'].get('context_window_tokens')
+
+    # Get real cost data from Claude Code (available in v2.0.25+)
+    if 'cost' in claude_data and isinstance(claude_data['cost'], dict):
+        claude_session_cost = claude_data['cost'].get('total_cost_usd')
+
+    # Check for context limit warning (available in v2.0.25+)
+    if claude_data.get('exceeds_200k_tokens', False):
+        exceeds_context_limit = True
 
     # PRIORITY 2: Check for real token metrics from OTLP proxy (fallback)
     if real_tokens is None:
@@ -427,7 +437,12 @@ def calculate_status(claude_data=None):
                 session_tokens = session.get('totalTokens', 0)
                 session_found = True
                 # Don't break, keep looking for exact match
-    
+
+    # Use real session cost from Claude Code if available (more accurate than ccusage)
+    if claude_session_cost is not None:
+        session_cost = claude_session_cost
+        session_found = True
+
     # Get today's total cost
     today_cost = 0.0
     today_tokens = 0
@@ -549,9 +564,13 @@ def calculate_status(claude_data=None):
         tokens_str = f"{format_number(display_tokens)} tokens"
 
 
-    # Build status line parts
+    # Build status line parts with context warning if needed
+    model_display = f"🤖 {model}"
+    if exceeds_context_limit:
+        model_display += " ⚠️"
+
     status_parts = [
-        f"🤖 {model}"
+        model_display
     ]
     
     # Add codeindex status if available (optional dependency)
