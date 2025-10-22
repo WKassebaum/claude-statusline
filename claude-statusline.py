@@ -334,22 +334,38 @@ def calculate_status(claude_data=None):
     if claude_data is None:
         claude_data = {}
     blocks_data, session_data, daily_data = get_ccusage_data()
-    
-    # Check for real token metrics from OTLP proxy
+
+    # PRIORITY 1: Check for real context data from Claude Code's JSON input
     real_tokens = None
-    metrics_file = os.path.expanduser('~/.claude/token-metrics.json')
-    if os.path.exists(metrics_file):
-        try:
-            with open(metrics_file, 'r') as f:
-                metrics_data = json.load(f)
-                # Only use metrics if they're recent (within last 60 seconds)
-                if 'timestamp' in metrics_data:
-                    metrics_time = datetime.fromisoformat(metrics_data['timestamp'])
-                    age_seconds = (datetime.now() - metrics_time).total_seconds()
-                    if age_seconds < 60:
-                        real_tokens = metrics_data.get('totalUsed', 0)
-        except:
-            pass
+    context_window_tokens = None
+    context_usage_percent = None
+
+    if 'context' in claude_data:
+        context_data = claude_data['context']
+        if isinstance(context_data, dict):
+            # Get actual token usage from Claude Code
+            real_tokens = context_data.get('used_tokens')
+            context_usage_percent = context_data.get('usage_percent')
+
+    if 'model' in claude_data and isinstance(claude_data['model'], dict):
+        # Get context window size from model info
+        context_window_tokens = claude_data['model'].get('context_window_tokens')
+
+    # PRIORITY 2: Check for real token metrics from OTLP proxy (fallback)
+    if real_tokens is None:
+        metrics_file = os.path.expanduser('~/.claude/token-metrics.json')
+        if os.path.exists(metrics_file):
+            try:
+                with open(metrics_file, 'r') as f:
+                    metrics_data = json.load(f)
+                    # Only use metrics if they're recent (within last 60 seconds)
+                    if 'timestamp' in metrics_data:
+                        metrics_time = datetime.fromisoformat(metrics_data['timestamp'])
+                        age_seconds = (datetime.now() - metrics_time).total_seconds()
+                        if age_seconds < 60:
+                            real_tokens = metrics_data.get('totalUsed', 0)
+            except:
+                pass
     
     # Get current working directory
     cwd = get_current_working_directory()
@@ -518,14 +534,21 @@ def calculate_status(claude_data=None):
     today_str = f"${today_cost:.2f}"
     block_str = f"${block_cost:.2f}"
     
-    # Format token count - use real tokens if available
-    if real_tokens is not None:
-        tokens_str = f"📊 {format_number(real_tokens)} tokens (actual)"
+    # Format token count and context window
+    if real_tokens is not None and context_window_tokens is not None:
+        # We have actual context data from Claude Code!
+        tokens_str = f"📊 {format_number(real_tokens)}/{format_number(context_window_tokens)}"
+        if context_usage_percent is not None:
+            tokens_str += f" ({context_usage_percent}%)"
+    elif real_tokens is not None:
+        # We have real tokens but not context window
+        tokens_str = f"📊 {format_number(real_tokens)} tokens"
     else:
+        # Fallback to ccusage estimates
         display_tokens = block_tokens
         tokens_str = f"{format_number(display_tokens)} tokens"
-    
-    
+
+
     # Build status line parts
     status_parts = [
         f"🤖 {model}"
@@ -541,7 +564,7 @@ def calculate_status(claude_data=None):
     status_parts.extend([
         f"💰 {session_str} session / {today_str} today / {block_str} block ({time_remaining} left)",
         f"🔥 {burn_str}",
-        f"{tokens_str} tokens", 
+        tokens_str,  # Already fully formatted with context window info
         f"{block_usage_pct:.1f}% used",
         f"{time_left} left"
     ])
