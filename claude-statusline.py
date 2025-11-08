@@ -75,6 +75,103 @@ def get_current_working_directory():
     except:
         return None
 
+def format_model_name(model_id):
+    """Format raw model ID into a friendly display name"""
+    if not model_id:
+        return None
+
+    model_id_lower = model_id.lower()
+
+    # Anthropic models
+    if 'opus-4-1' in model_id_lower:
+        return "Opus 4.1"
+    elif 'opus-4' in model_id_lower:
+        return "Opus 4"
+    elif 'sonnet-4-5' in model_id_lower:
+        return "Sonnet 4.5"
+    elif 'sonnet-4' in model_id_lower:
+        return "Sonnet 4"
+    elif 'sonnet-3-5' in model_id_lower or 'sonnet-20241022' in model_id_lower:
+        return "Sonnet 3.5"
+    elif 'sonnet' in model_id_lower:
+        return "Sonnet"
+    elif 'haiku' in model_id_lower:
+        return "Haiku"
+
+    # Google models
+    elif 'gemini-2.5-pro' in model_id_lower:
+        return "Gemini 2.5 Pro"
+    elif 'gemini-2.5-flash' in model_id_lower:
+        return "Gemini 2.5 Flash"
+    elif 'gemini' in model_id_lower:
+        return "Gemini"
+
+    # xAI models
+    elif 'grok-4-fast' in model_id_lower:
+        return "Grok 4 Fast"
+    elif 'grok-4' in model_id_lower:
+        return "Grok 4"
+    elif 'grok' in model_id_lower:
+        return "Grok"
+
+    # OpenAI models
+    elif 'o3' in model_id_lower:
+        return "O3"
+    elif 'gpt-5' in model_id_lower:
+        return "GPT-5"
+    elif 'gpt-4' in model_id_lower:
+        return "GPT-4"
+
+    # Generic fallback
+    elif 'claude-' in model_id_lower:
+        return model_id.replace('claude-', '').replace('-', ' ').title()
+    else:
+        # Return cleaned up version
+        return model_id.replace('-', ' ').title()
+
+def get_ccr_port():
+    """Read CCR port from config file"""
+    try:
+        import os
+        import json
+        ccr_config_path = os.path.expanduser("~/.claude-code-router/config.json")
+        with open(ccr_config_path, 'r') as f:
+            config = json.load(f)
+            return config.get('PORT', 8181)  # Default to 8181 if not specified
+    except:
+        return 8181  # Default CCR port
+
+def get_ccr_routed_model(session_id):
+    """Query CCR for the actual routed model for this session"""
+    try:
+        # Get CCR port from config
+        ccr_port = get_ccr_port()
+
+        # Check if CCR is running
+        result = subprocess.run(
+            ["curl", "-s", f"http://localhost:{ccr_port}/api/statusline/usage?sessionId={session_id}"],
+            capture_output=True,
+            text=True,
+            timeout=1
+        )
+
+        if result.returncode == 0 and result.stdout:
+            data = json.loads(result.stdout)
+
+            # Check if CCR has actual routing info for this session
+            current_model = data.get('currentModel', {})
+            if current_model.get('isActual'):
+                # CCR has routed this session, return the formatted model name
+                raw_model = current_model.get('model', '').strip()
+                return format_model_name(raw_model)
+            # If not isActual, CCR doesn't have routing info for this session
+            # Return None to fall back to Claude Code's model
+
+        return None
+    except:
+        # CCR not available or error occurred
+        return None
+
 def get_codeindex_status():
     """Get codeindex status with progress tracking"""
     try:
@@ -477,11 +574,24 @@ def calculate_status(claude_data=None):
         mins = int(time_remaining_mins % 60)
         time_left = f"~{hours}h{mins}m"
     
-    # Detect model from current block or stdin
+    # Detect model with CCR-aware priority:
+    # 1. Check if CCR has routing info for this session (highest priority)
+    # 2. Use Claude Code's model from stdin (vanilla claude sessions)
+    # 3. Detect from ccusage block models (fallback)
+
     model = "Claude"  # Default fallback
-    
-    # Try to get model from stdin (passed by Claude Code)
-    if 'model' in claude_data and claude_data['model']:
+
+    # PRIORITY 1: Check if CCR has routing info for this session
+    session_id = claude_data.get('session_id')
+    if session_id:
+        ccr_model = get_ccr_routed_model(session_id)
+        if ccr_model:
+            # CCR has routed this session, use the actual routed model
+            model = ccr_model
+
+    # PRIORITY 2: Try to get model from stdin (passed by Claude Code)
+    # Only if we didn't get a model from CCR
+    if model == "Claude" and 'model' in claude_data and claude_data['model']:
         model_data = claude_data['model']
         model_id = ""
         
@@ -512,9 +622,9 @@ def calculate_status(claude_data=None):
             elif 'claude-' in model_id_lower:
                 # Try to extract version from model ID
                 model = model_id.replace('claude-', '').replace('-', ' ').title()
-    
-    # If no model from stdin, try to detect from recent block models
-    elif current_block and 'models' in current_block and current_block['models']:
+
+    # PRIORITY 3: Fallback to ccusage block models if no model from CCR or stdin
+    if model == "Claude" and current_block and 'models' in current_block and current_block['models']:
         # Get all non-synthetic models and parse them
         model_names = []
         seen_models = set()
