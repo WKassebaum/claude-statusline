@@ -82,8 +82,10 @@ def format_model_name(model_id):
 
     model_id_lower = model_id.lower()
 
-    # Anthropic models
-    if 'opus-4-1' in model_id_lower:
+    # Anthropic models (order matters - check more specific patterns first)
+    if 'opus-4-5' in model_id_lower:
+        return "Opus 4.5"
+    elif 'opus-4-1' in model_id_lower:
         return "Opus 4.1"
     elif 'opus-4' in model_id_lower:
         return "Opus 4"
@@ -98,11 +100,15 @@ def format_model_name(model_id):
     elif 'haiku' in model_id_lower:
         return "Haiku"
 
-    # Google models
+    # Google models (order matters - check more specific patterns first)
+    elif 'gemini-3-pro' in model_id_lower or 'gemini-3.0-pro' in model_id_lower:
+        return "Gemini 3 Pro"
     elif 'gemini-2.5-pro' in model_id_lower:
         return "Gemini 2.5 Pro"
     elif 'gemini-2.5-flash' in model_id_lower:
         return "Gemini 2.5 Flash"
+    elif 'gemini-2' in model_id_lower:
+        return "Gemini 2"
     elif 'gemini' in model_id_lower:
         return "Gemini"
 
