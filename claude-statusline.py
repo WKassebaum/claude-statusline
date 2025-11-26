@@ -611,7 +611,9 @@ def calculate_status(claude_data=None):
         # Parse model name from ID if we got a string
         if model_id and isinstance(model_id, str):
             model_id_lower = model_id.lower()
-            if 'opus-4-1' in model_id_lower:
+            if 'opus-4-5' in model_id_lower:
+                model = "Opus 4.5"
+            elif 'opus-4-1' in model_id_lower:
                 model = "Opus 4.1"
             elif 'opus-4' in model_id_lower:
                 model = "Opus 4"
@@ -638,7 +640,9 @@ def calculate_status(claude_data=None):
         for model_id in reversed(current_block['models']):
             if model_id != '<synthetic>':
                 parsed_model = None
-                if 'opus-4-1' in model_id:
+                if 'opus-4-5' in model_id:
+                    parsed_model = "Opus 4.5"
+                elif 'opus-4-1' in model_id:
                     parsed_model = "Opus 4.1"
                 elif 'opus-4' in model_id:
                     parsed_model = "Opus 4"
