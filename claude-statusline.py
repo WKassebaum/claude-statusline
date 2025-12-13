@@ -270,88 +270,106 @@ def get_codeindex_status():
         except Exception:
             return None
 
+def normalize_collection_name(folder_name):
+    """Normalize folder name to match codeindex collection naming convention.
+
+    Codeindex normalizes names to: lowercase, spaces replaced with hyphens.
+    Example: 'Submittal RFI Processing System' -> 'submittal-rfi-processing-system'
+    """
+    return folder_name.lower().replace(' ', '-')
+
 def parse_codeindex_with_progress(collections_data, logs_data, project_name, expected_collection, cwd):
     """Parse codeindex status with progress tracking and parent directory support"""
     if not collections_data or 'result' not in collections_data:
         return None  # Return None when service is unreachable
-    
+
     try:
         collections = collections_data['result']['collections']
         collection_names = [col.get('name', '') for col in collections]
+        # Also create lowercase versions for case-insensitive matching
+        collection_names_lower = [name.lower() for name in collection_names]
     except (KeyError, TypeError):
         return None  # Return None on data structure errors
-    
+
     # Walk up directory tree to find indexed parent projects
     current_collection = None
     matched_project_name = None
-    
+    matched_collection_name = None
+
     path_parts = cwd.rstrip('/').split('/')
     for i in range(len(path_parts), 0, -1):
         # Get directory name at this level
         dir_name = path_parts[i-1]
-        expected_coll = f"codeindex-{dir_name}"
-        
-        # Check if this directory level has a collection
-        if expected_coll in collection_names:
+        # Normalize the expected collection name (lowercase, spaces -> hyphens)
+        normalized_name = normalize_collection_name(dir_name)
+        expected_coll = f"codeindex-{normalized_name}"
+
+        # Check if this directory level has a collection (case-insensitive)
+        if expected_coll in collection_names_lower:
             # Find the actual collection object
             for collection in collections:
-                if collection.get('name', '') == expected_coll:
+                if collection.get('name', '').lower() == expected_coll:
                     current_collection = collection
                     matched_project_name = dir_name
+                    matched_collection_name = collection.get('name', '')
                     break
             if current_collection:
                 break
-        
+
         # Stop at reasonable boundaries (home directory, etc.)
         if dir_name in ['Users', 'home', 'root'] or len(path_parts[:i]) < 3:
             break
-    
-    # If we didn't find a match, fall back to original behavior
+
+    # If we didn't find a match, fall back to original behavior with normalization
     if not current_collection:
+        normalized_expected = f"codeindex-{normalize_collection_name(project_name)}"
         for collection in collections:
-            if collection.get('name', '') == expected_collection:
+            if collection.get('name', '').lower() == normalized_expected:
                 current_collection = collection
                 matched_project_name = project_name
+                matched_collection_name = collection.get('name', '')
                 break
     
     # Parse logs for progress information
     is_indexing = False
     total_files = None
     current_chunks = 0
-    
+
     if logs_data and 'output' in logs_data:
         # Check last 50 log entries for broader detection
         recent_logs = logs_data['output'][-50:]
         all_logs = logs_data['output']
-        
+
         # Look for any recent insertion activity for this collection
+        # Use the actual matched collection name for log searching
+        search_collection = matched_collection_name or f"codeindex-{normalize_collection_name(project_name)}"
         for log_entry in recent_logs:
-            if f"📝 Inserting" in log_entry and expected_collection in log_entry:
+            if f"📝 Inserting" in log_entry and search_collection in log_entry:
                 is_indexing = True
                 break
 
         # Look for tracking count and completion info in all logs for this collection
-        if matched_project_name:
+        if matched_collection_name:
             for entry in all_logs:
-                if f"codeindex-{matched_project_name}" in entry:
+                if matched_collection_name in entry:
                     # Parse total files being tracked
                     if "tracking" in entry:
                         match = re.search(r'tracking (\d+) files', entry)
                         if match:
                             total_files = int(match.group(1))
-                    
-                    # Parse completion status  
+
+                    # Parse completion status
                     if "✅ Initial index completed:" in entry:
                         match = re.search(r'(\d+) files, (\d+) chunks', entry)
                         if match:
                             total_files = int(match.group(1))
                             current_chunks = int(match.group(2))
-    
-    # If collection exists, get current document count
-    if current_collection:
+
+    # If collection exists, get current document count using actual collection name
+    if current_collection and matched_collection_name:
         try:
             collection_result = subprocess.run(
-                ["curl", "-s", f"http://localhost:6333/collections/{expected_collection}"],
+                ["curl", "-s", f"http://localhost:6333/collections/{matched_collection_name}"],
                 capture_output=True,
                 text=True,
                 timeout=1
