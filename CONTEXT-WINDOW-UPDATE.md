@@ -1,48 +1,67 @@
 # Context Window Integration - Update Summary
 
-## What Changed
+## What Changed (v2.0.65+ Schema)
 
-Your colleague was **absolutely correct**! Claude Code provides real-time context usage data through its statusline API hook.
+Claude Code provides real-time context usage data through its statusline API hook using the `context_window` object.
 
-### The Discovery
+### Current JSON Schema (v2.0.65+)
 
 Claude Code sends JSON data via stdin to your statusline script with this structure:
 
 ```json
 {
-  "hook_event_name": "Status",
   "model": {
-    "id": "claude-sonnet-4-5-20250929",
-    "display_name": "Sonnet 4.5",
-    "context_window_tokens": 200000
+    "id": "claude-opus-4-5-20251101",
+    "display_name": "Opus 4.5"
   },
-  "context": {
-    "used_tokens": 84217,
-    "usage_percent": 42
+  "context_window": {
+    "context_window_size": 200000,
+    "used_percentage": 42,
+    "current_usage": {
+      "input_tokens": 75000,
+      "output_tokens": 9000,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0
+    },
+    "total_input_tokens": 330050,
+    "total_output_tokens": 10614
+  },
+  "cost": {
+    "total_cost_usd": 0.35
   }
 }
 ```
 
-### What We Were Missing
+### Important: `current_usage` vs `total_*` Fields
 
-Our script was **already reading JSON from stdin** (line 554-562), but:
-- ✅ We were parsing `model` data for model detection
-- ❌ We were **ignoring** the `context` data completely!
-- ❌ We were using `ccusage` estimates instead of actual values
+⚠️ **WARNING**: Do NOT use `total_input_tokens` and `total_output_tokens` for context percentage!
+
+- `total_*` fields = **Cumulative session totals** (all tokens ever sent/received)
+- `current_usage` = **Actual current context window contents**
+- `used_percentage` = **Pre-calculated accurate percentage** (matches `/context` command)
 
 ### The Fix
 
-**Priority 1**: Parse Claude Code's actual context data:
+**Priority 1**: Parse Claude Code's `context_window` object:
 ```python
-# PRIORITY 1: Check for real context data from Claude Code's JSON input
-if 'context' in claude_data:
-    context_data = claude_data['context']
-    if isinstance(context_data, dict):
-        real_tokens = context_data.get('used_tokens')
-        context_usage_percent = context_data.get('usage_percent')
+# Parse context_window object (v2.0.65+ schema)
+if 'context_window' in claude_data:
+    cw_data = claude_data['context_window']
+    if isinstance(cw_data, dict):
+        # Get context window size
+        context_window_tokens = cw_data.get('context_window_size')
 
-if 'model' in claude_data and isinstance(claude_data['model'], dict):
-    context_window_tokens = claude_data['model'].get('context_window_tokens')
+        # Get usage percentage directly if available (most accurate)
+        context_usage_percent = cw_data.get('used_percentage')
+
+        # Calculate current tokens from current_usage (not total_*)
+        current_usage = cw_data.get('current_usage')
+        if isinstance(current_usage, dict) and current_usage:
+            input_tokens = current_usage.get('input_tokens', 0) or 0
+            output_tokens = current_usage.get('output_tokens', 0) or 0
+            cache_creation = current_usage.get('cache_creation_input_tokens', 0) or 0
+            cache_read = current_usage.get('cache_read_input_tokens', 0) or 0
+            real_tokens = input_tokens + output_tokens + cache_creation + cache_read
 ```
 
 **Priority 2**: Display the context window information:
@@ -91,7 +110,7 @@ Expected output shows the context window data in all test scenarios.
 ## Implementation Details
 
 **Files Modified:**
-- `claude-statusline.py` (lines 332-372, 537-549)
+- `claude-statusline-v1092.py` (lines 182-220 for parsing, 450-470 for display)
 
 **New Dependencies:** None (uses existing JSON parsing)
 

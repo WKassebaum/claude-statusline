@@ -478,21 +478,50 @@ def calculate_status(claude_data=None):
     blocks_data, session_data, daily_data = get_ccusage_data()
 
     # PRIORITY 1: Check for real context data from Claude Code's JSON input
+    # The context_window object contains the actual context tracking data (v2.0.65+)
     real_tokens = None
     context_window_tokens = None
     context_usage_percent = None
     claude_session_cost = None
     exceeds_context_limit = False
 
-    if 'context' in claude_data:
+    # NEW: Parse context_window object (v2.0.65+ schema)
+    if 'context_window' in claude_data:
+        cw_data = claude_data['context_window']
+        if isinstance(cw_data, dict):
+            # Get context window size
+            context_window_tokens = cw_data.get('context_window_size')
+
+            # Get usage percentage directly if available (most accurate)
+            context_usage_percent = cw_data.get('used_percentage')
+
+            # Calculate current tokens from current_usage (not total_* which are cumulative)
+            current_usage = cw_data.get('current_usage')
+            if isinstance(current_usage, dict) and current_usage:
+                # Sum all token types that count toward context
+                input_tokens = current_usage.get('input_tokens', 0) or 0
+                output_tokens = current_usage.get('output_tokens', 0) or 0
+                cache_creation = current_usage.get('cache_creation_input_tokens', 0) or 0
+                cache_read = current_usage.get('cache_read_input_tokens', 0) or 0
+                total = input_tokens + output_tokens + cache_creation + cache_read
+                # Only use if we actually got tokens
+                if total > 0:
+                    real_tokens = total
+
+            # If we don't have current_usage but have percentage and window size, calculate tokens
+            if real_tokens is None and context_usage_percent is not None and context_window_tokens is not None:
+                real_tokens = int(context_window_tokens * context_usage_percent / 100)
+
+    # LEGACY: Check old 'context' format for backward compatibility
+    if real_tokens is None and 'context' in claude_data:
         context_data = claude_data['context']
         if isinstance(context_data, dict):
-            # Get actual token usage from Claude Code
+            # Get actual token usage from Claude Code (legacy format)
             real_tokens = context_data.get('used_tokens')
             context_usage_percent = context_data.get('usage_percent')
 
-    if 'model' in claude_data and isinstance(claude_data['model'], dict):
-        # Get context window size from model info
+    # Get context window size from model info if not already set
+    if context_window_tokens is None and 'model' in claude_data and isinstance(claude_data['model'], dict):
         context_window_tokens = claude_data['model'].get('context_window_tokens')
 
     # Get real cost data from Claude Code (available in v2.0.25+)
@@ -713,7 +742,14 @@ def calculate_status(claude_data=None):
         # We have actual context data from Claude Code!
         tokens_str = f"📊 {format_number(real_tokens)}/{format_number(context_window_tokens)}"
         if context_usage_percent is not None:
-            tokens_str += f" ({context_usage_percent}%)"
+            # Format percentage - handle both int and float
+            if isinstance(context_usage_percent, float) and context_usage_percent != int(context_usage_percent):
+                tokens_str += f" ({context_usage_percent:.1f}%)"
+            else:
+                tokens_str += f" ({int(context_usage_percent)}%)"
+    elif context_usage_percent is not None and context_window_tokens is not None:
+        # We have percentage and window size but not exact tokens
+        tokens_str = f"📊 {int(context_usage_percent)}% of {format_number(context_window_tokens)}"
     elif real_tokens is not None:
         # We have real tokens but not context window
         tokens_str = f"📊 {format_number(real_tokens)} tokens"
@@ -724,8 +760,11 @@ def calculate_status(claude_data=None):
 
 
     # Build status line parts with context warning if needed
+    # Show warning when exceeds_200k_tokens flag is set OR when usage is >= 75%
     model_display = f"🤖 {model}"
     if exceeds_context_limit:
+        model_display += " ⚠️"
+    elif context_usage_percent is not None and context_usage_percent >= 75:
         model_display += " ⚠️"
 
     status_parts = [
