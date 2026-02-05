@@ -26,6 +26,78 @@ def format_number(num):
         return str(num)
 
 
+def format_model_name(model_id):
+    """Format raw model ID into a friendly display name"""
+    if not model_id:
+        return None
+
+    model_id_lower = model_id.lower()
+
+    # Anthropic models (order matters - check more specific patterns first)
+    if 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
+        return "Opus 4.6"
+    elif 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
+        return "Opus 4.5"
+    elif 'opus-4-1' in model_id_lower or 'opus 4.1' in model_id_lower:
+        return "Opus 4.1"
+    elif 'opus-4' in model_id_lower or 'opus 4' in model_id_lower:
+        return "Opus 4"
+    elif 'sonnet-4-5' in model_id_lower or 'sonnet 4.5' in model_id_lower:
+        return "Sonnet 4.5"
+    elif 'sonnet-4' in model_id_lower or 'sonnet 4' in model_id_lower:
+        return "Sonnet 4"
+    elif 'sonnet-3-5' in model_id_lower or 'sonnet 3.5' in model_id_lower or 'sonnet-20241022' in model_id_lower:
+        return "Sonnet 3.5"
+    elif 'sonnet' in model_id_lower:
+        return "Sonnet"
+    elif 'haiku' in model_id_lower:
+        return "Haiku"
+
+    # Google models
+    elif 'gemini-3-pro' in model_id_lower or 'gemini-3.0-pro' in model_id_lower:
+        return "Gemini 3 Pro"
+    elif 'gemini-3-flash' in model_id_lower or 'gemini-3.0-flash' in model_id_lower:
+        return "Gemini 3 Flash"
+    elif 'gemini-2.5-pro' in model_id_lower:
+        return "Gemini 2.5 Pro"
+    elif 'gemini-2.5-flash-lite' in model_id_lower:
+        return "Gemini 2.5 Flash Lite"
+    elif 'gemini-2.5-flash' in model_id_lower:
+        return "Gemini 2.5 Flash"
+    elif 'gemini-2' in model_id_lower:
+        return "Gemini 2"
+    elif 'gemini' in model_id_lower:
+        return "Gemini"
+
+    # xAI models
+    elif 'grok-4-1-fast' in model_id_lower or 'grok-4.1-fast' in model_id_lower:
+        return "Grok 4.1 Fast"
+    elif 'grok-4-1' in model_id_lower or 'grok-4.1' in model_id_lower:
+        return "Grok 4.1"
+    elif 'grok-4-fast' in model_id_lower:
+        return "Grok 4 Fast"
+    elif 'grok-4' in model_id_lower:
+        return "Grok 4"
+    elif 'grok' in model_id_lower:
+        return "Grok"
+
+    # OpenAI models
+    elif 'o3' in model_id_lower:
+        return "O3"
+    elif 'gpt-5-3' in model_id_lower or 'gpt-5.3' in model_id_lower:
+        return "GPT-5.3"
+    elif 'gpt-5' in model_id_lower:
+        return "GPT-5"
+    elif 'gpt-4' in model_id_lower:
+        return "GPT-4"
+
+    # Generic fallback
+    elif 'claude-' in model_id_lower:
+        return model_id.replace('claude-', '').replace('-', ' ').title()
+    else:
+        return model_id.replace('-', ' ').title()
+
+
 def get_ccusage_data():
     """Get usage data from ccusage tool with improved error handling"""
     try:
@@ -383,27 +455,11 @@ def calculate_status(claude_data=None):
             # Try display_name first, then other fields
             model_id = model_data.get('display_name') or model_data.get('name') or model_data.get('id', '')
         
-        # Parse model name from ID
+        # Parse model name from ID using format_model_name()
         if model_id and isinstance(model_id, str):
-            model_id_lower = model_id.lower()
-            if 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
-                model = "Opus 4.5"
-            elif 'opus-4-1' in model_id_lower or 'opus 4.1' in model_id_lower:
-                model = "Opus 4.1"
-            elif 'opus-4' in model_id_lower or 'opus 4' in model_id_lower:
-                model = "Opus 4"
-            elif 'sonnet-4-5' in model_id_lower or 'sonnet 4.5' in model_id_lower:
-                model = "Sonnet 4.5"
-            elif 'sonnet-4' in model_id_lower or 'sonnet 4' in model_id_lower:
-                model = "Sonnet 4"
-            elif 'sonnet-3-5' in model_id_lower or 'sonnet 3.5' in model_id_lower or 'sonnet-20241022' in model_id_lower:
-                model = "Sonnet 3.5"
-            elif 'sonnet' in model_id_lower:
-                model = "Sonnet"
-            elif 'haiku' in model_id_lower:
-                model = "Haiku"
-            elif model_id:  # Use the display name or ID as-is if we have it
-                model = model_id.replace('claude-', '').replace('-', ' ').title()
+            parsed = format_model_name(model_id)
+            if parsed:
+                model = parsed
     
     # Fallback to ccusage block data for models
     elif current_block and 'models' in current_block and current_block['models']:
@@ -412,22 +468,8 @@ def calculate_status(claude_data=None):
         
         for model_id in reversed(current_block['models']):
             if model_id != '<synthetic>':
-                parsed_model = None
-                if 'opus-4-5' in model_id:
-                    parsed_model = "Opus 4.5"
-                elif 'opus-4-1' in model_id:
-                    parsed_model = "Opus 4.1"
-                elif 'opus-4' in model_id:
-                    parsed_model = "Opus 4"
-                elif 'sonnet-4-5' in model_id:
-                    parsed_model = "Sonnet 4.5"
-                elif 'sonnet-4' in model_id:
-                    parsed_model = "Sonnet 4"
-                elif 'sonnet-3' in model_id:
-                    parsed_model = "Sonnet 3.5"
-                elif 'haiku' in model_id:
-                    parsed_model = "Haiku"
-                
+                parsed_model = format_model_name(model_id)
+
                 # Add to list if we parsed it and haven't seen it before
                 if parsed_model and parsed_model not in seen_models:
                     model_names.append(parsed_model)
