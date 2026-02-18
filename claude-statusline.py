@@ -112,6 +112,8 @@ def format_model_name(model_id):
         return "Opus 4.1"
     elif 'opus-4' in model_id_lower:
         return "Opus 4"
+    elif 'sonnet-4-6' in model_id_lower or 'sonnet 4.6' in model_id_lower:
+        return "Sonnet 4.6"
     elif 'sonnet-4-5' in model_id_lower:
         return "Sonnet 4.5"
     elif 'sonnet-4' in model_id_lower:
