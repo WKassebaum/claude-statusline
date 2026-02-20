@@ -55,7 +55,9 @@ def format_model_name(model_id):
     elif 'haiku' in model_id_lower:
         return "Haiku"
 
-    # Google models
+    # Google models (order matters - check more specific patterns first)
+    elif 'gemini-3.1-pro' in model_id_lower:
+        return "Gemini 3.1 Pro"
     elif 'gemini-3-pro' in model_id_lower or 'gemini-3.0-pro' in model_id_lower:
         return "Gemini 3 Pro"
     elif 'gemini-3-flash' in model_id_lower or 'gemini-3.0-flash' in model_id_lower:
