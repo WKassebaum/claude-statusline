@@ -122,6 +122,8 @@ def format_model_name(model_id):
         return "Sonnet 3.5"
     elif 'sonnet' in model_id_lower:
         return "Sonnet"
+    elif 'haiku-4-5' in model_id_lower or 'haiku 4.5' in model_id_lower:
+        return "Haiku 4.5"
     elif 'haiku' in model_id_lower:
         return "Haiku"
 
@@ -158,6 +160,10 @@ def format_model_name(model_id):
     # OpenAI models (order matters - check more specific patterns first)
     elif 'o3' in model_id_lower:
         return "O3"
+    elif 'gpt-5-4-pro' in model_id_lower or 'gpt-5.4-pro' in model_id_lower:
+        return "GPT-5.4 Pro"
+    elif 'gpt-5-4' in model_id_lower or 'gpt-5.4' in model_id_lower:
+        return "GPT-5.4"
     elif 'gpt-5-3' in model_id_lower or 'gpt-5.3' in model_id_lower:
         return "GPT-5.3"
     elif 'gpt-5' in model_id_lower:
