@@ -75,7 +75,9 @@ def format_model_name(model_id):
     elif 'gemini' in model_id_lower:
         return "Gemini"
 
-    # xAI models
+    # xAI models (order matters - check more specific patterns first)
+    elif 'grok-4-2' in model_id_lower or 'grok-4.2' in model_id_lower:
+        return "Grok 4.2 Beta"
     elif 'grok-4-1-fast' in model_id_lower or 'grok-4.1-fast' in model_id_lower:
         return "Grok 4.1 Fast"
     elif 'grok-4-1' in model_id_lower or 'grok-4.1' in model_id_lower:
