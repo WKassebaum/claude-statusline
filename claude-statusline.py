@@ -104,7 +104,9 @@ def format_model_name(model_id):
     model_id_lower = model_id.lower()
 
     # Anthropic models (order matters - check more specific patterns first)
-    if 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
+    if 'opus-4-7' in model_id_lower or 'opus 4.7' in model_id_lower:
+        return "Opus 4.7"
+    elif 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
         return "Opus 4.6"
     elif 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
         return "Opus 4.5"
@@ -112,6 +114,8 @@ def format_model_name(model_id):
         return "Opus 4.1"
     elif 'opus-4' in model_id_lower:
         return "Opus 4"
+    elif 'sonnet-4-7' in model_id_lower or 'sonnet 4.7' in model_id_lower:
+        return "Sonnet 4.7"
     elif 'sonnet-4-6' in model_id_lower or 'sonnet 4.6' in model_id_lower:
         return "Sonnet 4.6"
     elif 'sonnet-4-5' in model_id_lower:
@@ -730,19 +734,34 @@ def calculate_status(claude_data=None):
     today_str = f"${today_cost:.2f}"
     block_str = f"${block_cost:.2f}"
     
-    # Format token count and context window
+    # Color constants for context display (defined early for use below)
+    _RESET = "\033[0m"
+    _GREEN = "\033[32m"
+    _YELLOW = "\033[33m"
+    _RED = "\033[31m"
+
+    def _ctx_color(pct):
+        if pct is None:
+            return ""
+        if pct >= 80:
+            return _RED
+        if pct >= 50:
+            return _YELLOW
+        return _GREEN
+
+    # Format token count and context window with color coding
     if real_tokens is not None and context_window_tokens is not None:
-        # We have actual context data from Claude Code!
-        tokens_str = f"📊 {format_number(real_tokens)}/{format_number(context_window_tokens)}"
+        c = _ctx_color(context_usage_percent)
+        tokens_str = f"📊 {c}{format_number(real_tokens)}/{format_number(context_window_tokens)}"
         if context_usage_percent is not None:
-            # Format percentage - handle both int and float
             if isinstance(context_usage_percent, float) and context_usage_percent != int(context_usage_percent):
                 tokens_str += f" ({context_usage_percent:.1f}%)"
             else:
                 tokens_str += f" ({int(context_usage_percent)}%)"
+        tokens_str += _RESET
     elif context_usage_percent is not None and context_window_tokens is not None:
-        # We have percentage and window size but not exact tokens
-        tokens_str = f"📊 {int(context_usage_percent)}% of {format_number(context_window_tokens)}"
+        c = _ctx_color(context_usage_percent)
+        tokens_str = f"📊 {c}{int(context_usage_percent)}% of {format_number(context_window_tokens)}{_RESET}"
     elif real_tokens is not None:
         # We have real tokens but not context window
         tokens_str = f"📊 {format_number(real_tokens)} tokens"
@@ -752,13 +771,29 @@ def calculate_status(claude_data=None):
         tokens_str = f"{format_number(display_tokens)} tokens"
 
 
-    # Build status line parts with context warning if needed
-    # Show warning when exceeds_200k_tokens flag is set OR when usage is >= 75%
+    # Build status line parts with context warning and color coding
+    # Colors: green <50%, yellow 50-79%, red 80%+
+    RESET = "\033[0m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+
+    context_color = ""
+    if context_usage_percent is not None:
+        if context_usage_percent >= 80:
+            context_color = RED
+        elif context_usage_percent >= 50:
+            context_color = YELLOW
+        else:
+            context_color = GREEN
+
     model_display = f"🤖 {model}"
     if exceeds_context_limit:
-        model_display += " ⚠️"
-    elif context_usage_percent is not None and context_usage_percent >= 75:
-        model_display += " ⚠️"
+        model_display += f" {RED}⚠️ CONTEXT FULL{RESET}"
+    elif context_usage_percent is not None and context_usage_percent >= 80:
+        model_display += f" {RED}⚠️ {int(context_usage_percent)}%{RESET}"
+    elif context_usage_percent is not None and context_usage_percent >= 50:
+        model_display += f" {YELLOW}⚠️{RESET}"
 
     status_parts = [
         model_display
