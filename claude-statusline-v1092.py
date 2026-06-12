@@ -13,6 +13,20 @@ import sys
 from datetime import datetime
 import os
 import re
+import shutil
+
+# Force UTF-8 output so emoji render on Windows (default cp1252 raises
+# UnicodeEncodeError). No-op on platforms that are already UTF-8.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+# Resolve the ccusage executable once. On Windows the npm shim is
+# "ccusage.cmd", which subprocess cannot locate from the bare name
+# "ccusage", so resolve the full path (incl. extension) up front.
+CCUSAGE = shutil.which("ccusage") or "ccusage"
 
 def format_number(num):
     """Format number with K/M/B suffix"""
@@ -115,7 +129,7 @@ def get_ccusage_data():
     try:
         # Get block data for current session
         blocks_result = subprocess.run(
-            ["ccusage", "blocks", "--json", "--offline"],
+            [CCUSAGE, "blocks", "--json", "--offline"],
             capture_output=True,
             text=True,
             timeout=10
@@ -124,7 +138,7 @@ def get_ccusage_data():
         
         # Get session data
         session_result = subprocess.run(
-            ["ccusage", "session", "--json", "--offline"],
+            [CCUSAGE, "session", "--json", "--offline"],
             capture_output=True,
             text=True,
             timeout=10
@@ -133,7 +147,7 @@ def get_ccusage_data():
         
         # Get daily data for today
         daily_result = subprocess.run(
-            ["ccusage", "daily", "--json", "--offline"],
+            [CCUSAGE, "daily", "--json", "--offline"],
             capture_output=True,
             text=True,
             timeout=10
