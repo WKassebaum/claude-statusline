@@ -44,7 +44,9 @@ def format_model_name(model_id):
     model_id_lower = model_id.lower()
 
     # Anthropic models (order matters - check more specific patterns first)
-    if 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
+    if 'opus-5-5' in model_id_lower or 'opus 5.5' in model_id_lower:
+        return "Opus 5.5"
+    elif 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
         return "Opus 4.6"
     elif 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
         return "Opus 4.5"
