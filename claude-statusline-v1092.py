@@ -175,7 +175,7 @@ def get_codeindex_status():
         
         # Check collections with shorter timeout
         collections_result = subprocess.run(
-            ["curl", "-s", "--max-time", "1", "http://localhost:6333/collections"],
+            ["curl", "-s", "--connect-timeout", "0.1", "--max-time", "1", "http://127.0.0.1:6333/collections"],
             capture_output=True,
             text=True,
             timeout=1.5

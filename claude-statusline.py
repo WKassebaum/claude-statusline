@@ -198,7 +198,7 @@ def get_ccr_routed_model(session_id):
 
         # Check if CCR is running
         result = subprocess.run(
-            ["curl", "-s", f"http://localhost:{ccr_port}/api/statusline/usage?sessionId={session_id}"],
+            ["curl", "-s", "--connect-timeout", "0.1", f"http://127.0.0.1:{ccr_port}/api/statusline/usage?sessionId={session_id}"],
             capture_output=True,
             text=True,
             timeout=1
@@ -234,14 +234,16 @@ def get_codeindex_status():
         
         # Check collections and logs in parallel
         collections_result = subprocess.run(
-            ["curl", "-s", "http://localhost:6333/collections"],
+            ["curl", "-s", "--connect-timeout", "0.1", "http://127.0.0.1:6333/collections"],
             capture_output=True,
             text=True,
             timeout=2
         )
-        
+        if collections_result.returncode != 0 or not collections_result.stdout:
+            return None  # Qdrant unreachable; skip the logs probe
+
         logs_result = subprocess.run(
-            ["curl", "-s", "http://localhost:3847/logs"],
+            ["curl", "-s", "--connect-timeout", "0.1", "http://127.0.0.1:3847/logs"],
             capture_output=True,
             text=True,
             timeout=2
@@ -274,7 +276,7 @@ def get_codeindex_status():
         # Fallback to legacy method
         try:
             result = subprocess.run(
-                ["curl", "-s", "http://localhost:6333/collections"],
+                ["curl", "-s", "--connect-timeout", "0.1", "http://127.0.0.1:6333/collections"],
                 capture_output=True,
                 text=True,
                 timeout=2
@@ -391,7 +393,7 @@ def parse_codeindex_with_progress(collections_data, logs_data, project_name, exp
     if current_collection and matched_collection_name:
         try:
             collection_result = subprocess.run(
-                ["curl", "-s", f"http://localhost:6333/collections/{matched_collection_name}"],
+                ["curl", "-s", "--connect-timeout", "0.1", f"http://127.0.0.1:6333/collections/{matched_collection_name}"],
                 capture_output=True,
                 text=True,
                 timeout=1
