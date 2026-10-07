@@ -64,6 +64,8 @@ def format_model_name(model_id):
         return "Opus 4.1"
     elif 'opus-4' in model_id_lower or 'opus 4' in model_id_lower:
         return "Opus 4"
+    elif 'sonnet-4-7' in model_id_lower or 'sonnet 4.7' in model_id_lower:
+        return "Sonnet 4.7"
     elif 'sonnet-4-6' in model_id_lower or 'sonnet 4.6' in model_id_lower:
         return "Sonnet 4.6"
     elif 'sonnet-4-5' in model_id_lower or 'sonnet 4.5' in model_id_lower:
@@ -80,6 +82,10 @@ def format_model_name(model_id):
         return "Haiku"
 
     # Google models (order matters - check more specific patterns first)
+    elif 'gemini-3.5-pro' in model_id_lower or 'gemini-3-5-pro' in model_id_lower:
+        return "Gemini 3.5 Pro"
+    elif 'gemini-3.5-flash' in model_id_lower or 'gemini-3-5-flash' in model_id_lower:
+        return "Gemini 3.5 Flash"
     elif 'gemini-3.1-pro' in model_id_lower:
         return "Gemini 3.1 Pro"
     elif 'gemini-3-pro' in model_id_lower or 'gemini-3.0-pro' in model_id_lower:
@@ -98,6 +104,8 @@ def format_model_name(model_id):
         return "Gemini"
 
     # xAI models (order matters - check more specific patterns first)
+    elif 'grok-4-3' in model_id_lower or 'grok-4.3' in model_id_lower:
+        return "Grok 4.3"
     elif 'grok-4-2' in model_id_lower or 'grok-4.2' in model_id_lower:
         return "Grok 4.2 Beta"
     elif 'grok-4-1-fast' in model_id_lower or 'grok-4.1-fast' in model_id_lower:
