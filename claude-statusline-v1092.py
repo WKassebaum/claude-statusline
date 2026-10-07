@@ -46,6 +46,10 @@ def format_model_name(model_id):
     # Anthropic models (order matters - check more specific patterns first)
     if 'opus-5-5' in model_id_lower or 'opus 5.5' in model_id_lower:
         return "Opus 5.5"
+    elif 'sonnet-5-5' in model_id_lower or 'sonnet 5.5' in model_id_lower:
+        return "Sonnet 5.5"
+    elif 'fable-5-1' in model_id_lower or 'fable 5.1' in model_id_lower:
+        return "Fable 5.1"
     elif 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
         return "Opus 4.6"
     elif 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
