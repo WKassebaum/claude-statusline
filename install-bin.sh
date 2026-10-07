@@ -17,18 +17,6 @@ echo "   Claude Code Enhanced Statusline - Binary Installer"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Check if ccusage is installed
-if ! command -v ccusage &> /dev/null; then
-    echo -e "${RED}❌ Error: ccusage is not installed${NC}"
-    echo ""
-    echo "Please install ccusage first:"
-    echo "  npm install -g ccusage"
-    echo ""
-    exit 1
-fi
-
-echo -e "${GREEN}✓${NC} ccusage is installed"
-
 # Check if python3 is available
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}❌ Error: python3 is not installed${NC}"

@@ -1,17 +1,14 @@
 # Claude Code Enhanced Statusline
 
-Enhanced statusline for Claude Code that provides accurate token usage, costs, burn rate metrics, and optional codeindex integration. Compatible with all Claude Code versions including v1.0.92+.
+Enhanced statusline for Claude Code that shows context usage, session cost, subscription rate-limit usage, and optional codeindex status. Everything is read from the JSON Claude Code passes on stdin, so a refresh takes ~0.1s and needs no external tools. Compatible with all Claude Code versions including v1.0.92+.
 
 ## ✨ Features
 
-- 📊 **Accurate token usage percentage** - Real-time usage against block limits
-- 💰 **Complete cost tracking** - Session, daily, and block costs
-- 🔥 **Token burn rate** - Displayed in tokens/min with smart K/M/B formatting
-- ⏱️ **Time remaining** - Precise time left in current billing block
-- 🎯 **Session detection** - Automatic detection of current project session
+- 📊 **Context usage** - Tokens used against the context window, color-coded
+- 💰 **Session cost** - From Claude Code's own `cost.total_cost_usd`
+- ⏳ **Rate limits** - 5-hour and 7-day usage with time until reset (Pro/Max subscribers)
 - 🔍 **Codeindex integration** (optional) - Show active codebase indexing status
-- ⚠️ **Context limit warnings** - Visual indicator when exceeding 200k tokens
-- 🤖 **Multiple model display** - Shows comma-separated model names when using multiple models
+- ⚠️ **Context limit warnings** - Visual indicator when the context window is nearly full
 
 ## 🔄 Version Compatibility
 
@@ -19,24 +16,14 @@ This project provides **two statusline scripts** for different Claude Code versi
 
 | Claude Code Version | Script | Features |
 |---------------------|--------|----------|
-| **v1.0.92+** (Latest) | `claude-statusline-v1092.py` | ✅ Full v1.0.92+ JSON support<br>✅ Context limit warnings<br>✅ Enhanced error handling<br>✅ Multiple model display<br>✅ All cost tracking features |
+| **v1.0.92+** (Latest) | `claude-statusline-v1092.py` | ✅ Full v1.0.92+ JSON support<br>✅ Context limit warnings<br>✅ Enhanced error handling |
 | **v1.0.88 and earlier** | `claude-statusline.py` | ✅ Legacy JSON support<br>✅ Basic cost tracking<br>✅ Codeindex integration<br>❌ No context warnings |
 
 **The installer automatically selects the correct script** for your Claude Code version. For v1.0.92+, it uses the enhanced v1092 script.
 
 ## 📋 Prerequisites
 
-### Install ccusage
-
-Using Homebrew:
-```bash
-brew install ccusage
-```
-
-Or using npm:
-```bash
-npm install -g ccusage
-```
+No external usage tool is needed. Earlier versions shelled out to `ccusage` three times per refresh; each run re-reads every transcript under `~/.claude/projects`, which took 5-13s and several CPU cores per refresh once transcripts grew past ~1 GB.
 
 ### Requirements
 
@@ -83,28 +70,15 @@ The statusline will automatically update in Claude Code.
 
 **Standard format**:
 ```
-🤖 Opus 4.1 | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
-```
-
-**With multiple models** (v1.0.92+):
-```
-🤖 Opus 4.1, Sonnet 4 | 💰 $99.52 session / $52.95 today / $78.06 block (1h 40m left) | 🔥 482K/min | 96.5M tokens | 98.8% used | ~1h40m left
-```
-
-**With context limit warning** (v1.0.92+):
-```
-🤖 Opus 4.1 ⚠️ Context limit | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
+🤖 Opus 5.5 | 🌿 main | 💰 $3.46 session | ⏳ 5h 24% (2h12m) / 7d 81% (3d3h) | 📊 85.0K/200.0K (42.5%)
 ```
 
 **With codeindex integration** (when available):
 ```
-🤖 Opus 4.1 | 🔍 ✅ claude-codeindex | 💰 $3.25 session / $81.14 today / $77.30 block (1h 14m left) | 🔥 204K/min | 39.5M tokens | 40.4% used | ~1h14m left
+🤖 Opus 5.5 | 🔍 ✅ claude-codeindex | 💰 $3.46 session | ⏳ 5h 24% (2h12m) / 7d 81% (3d3h) | 📊 85.0K/200.0K (42.5%)
 ```
 
-**During active indexing**:
-```
-🤖 Opus 4.1 | 🔍 🔄 (42%) my-project | 💰 $3.25 session / $81.14 today ...
-```
+The `⏳` segment appears only for claude.ai Pro/Max subscribers, and only after the session's first API response. The `📊` segment appears once Claude Code reports context usage.
 
 ### What Each Field Shows
 
@@ -115,21 +89,9 @@ The statusline will automatically update in Claude Code.
   - `🔍 🔄 (42%) project-name` - Currently indexing (42% complete)
   - `🔍 ❌ service down` - Service unavailable
   - (not shown) - codeindex not installed (graceful fallback)
-- **Session cost**: Total cost for current working directory session
-- **Today's cost**: Total usage for today across all sessions
-- **Block cost**: Current 5-hour block usage and time remaining
-- **Burn rate**: Token consumption rate in tokens per minute
-- **Token count**: Current block tokens (matches ccusage display)
-- **Usage %**: Percentage of 97.6M token block limit used
-- **Time left**: Estimated time remaining based on burn rate
-
-**Components:**
-- **Model**: Current Claude model
-- **Costs**: Session, daily, and current block costs
-- **Burn rate**: Token consumption rate per minute
-- **Tokens**: Total session tokens
-- **Usage**: Percentage of block limit consumed
-- **Time**: Estimated time remaining
+- **Session cost**: Claude Code's estimated cost for this session (`cost.total_cost_usd`)
+- **Rate limits**: 5-hour and 7-day usage percentage, with time until each window resets
+- **Context**: Tokens in the context window, and the percentage used
 
 ## 🛠️ Manual Installation
 
@@ -227,10 +189,9 @@ The statusline monitors codeindex logs for active indexing operations:
 ### How It Works
 
 Both scripts follow the same core process:
-1. Query `ccusage` for session, daily, and block metrics
-2. Parse JSON output and calculate accurate percentages  
+1. Read the JSON Claude Code passes on stdin (`model`, `cost`, `context_window`, `rate_limits`)
+2. Add git branch and optional codeindex status
 3. Format output optimized for terminal display
-4. Return formatted statusline to Claude Code
 
 ### Version-Specific Differences
 
@@ -238,35 +199,26 @@ Both scripts follow the same core process:
 - Enhanced JSON input parsing for new Claude Code format
 - Supports `workspace.current_dir` and `cost.total_cost_usd` fields
 - Detects `exceeds_200k_tokens` for context limit warnings
-- Improved block detection logic (active blocks + recent non-gap blocks)
-- Longer ccusage timeouts (10s vs 3s) to prevent command failures
 - Enhanced model detection with `display_name` field support
 - Robust error handling with graceful fallbacks
 
 **claude-statusline.py (Legacy):**
 - Original JSON input format support
 - Basic cost tracking and codeindex integration
-- Shorter timeouts suitable for older ccusage versions
 - Simpler error handling
-
-### Cost Tracking Algorithm
-
-The statusline uses a sophisticated cost tracking system:
-1. **Session costs**: Matches current directory to ccusage session data
-2. **Daily costs**: Aggregates today's usage across all sessions  
-3. **Block costs**: Uses most recent active or non-gap block
-4. **Time estimates**: Based on current burn rate and remaining block limit
 
 ## 🐞 Troubleshooting
 
 **Statusline shows "Status unavailable"**
-- Verify `ccusage` is installed: `which ccusage`
 - Check Python 3: `which python3`
 - Test manually with the command above
 
 **Session shows N/A**
-- Script detects sessions based on current working directory
-- Ensure you're in an active project directory
+- Claude Code has not reported a cost yet; it appears after the first API response
+
+**No ⏳ rate-limit segment**
+- Only shown for claude.ai Pro/Max subscribers, after the session's first API response
+- API-key sessions have no rate-limit windows to show
 
 **Codeindex status not showing**
 - Check if codeindex service is running: `curl -s http://localhost:3847/health`
@@ -283,22 +235,10 @@ The statusline uses a sophisticated cost tracking system:
 - Check activity: `curl -s http://localhost:3847/logs`
 - Progress updates when new files are inserted
 
-**Cost tracking shows $0.00 for all values**
-- You may be using the wrong script for your Claude Code version
-- For v1.0.92+, use `claude-statusline-v1092.py`
-- For v1.0.88 and earlier, use `claude-statusline.py`
-- ccusage commands may be timing out - the v1092 script has longer timeouts
-- Run the installer again to auto-detect your version
-
 **Context warning not showing (v1.0.92+)**
 - Ensure you're using `claude-statusline-v1092.py`
 - Context warnings only appear when exceeding 200k tokens
 - Feature is only available in Claude Code v1.0.88+
-
-**Multiple models not displaying correctly**
-- Ensure you're using `claude-statusline-v1092.py` for v1.0.92+
-- Legacy script may not properly handle multiple models
-- Models should appear comma-separated: "Opus 4.1, Sonnet 4"
 
 ## 📄 License
 
@@ -317,6 +257,5 @@ Pull requests welcome! Please:
 
 For issues, please include:
 - Claude Code version
-- Output of `ccusage --version`
 - Error messages
 - Manual test output

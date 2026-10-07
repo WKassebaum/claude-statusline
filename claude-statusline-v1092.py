@@ -2,6 +2,7 @@
 """
 Claude Code Enhanced Statusline for v1.0.92+
 Compatible with latest Claude Code JSON input format including new fields.
+Everything comes from the JSON Claude Code passes on stdin; no ccusage dependency.
 
 Author: Claude Code Community
 License: MIT
@@ -13,7 +14,7 @@ import sys
 from datetime import datetime
 import os
 import re
-import shutil
+import time
 
 # Force UTF-8 output so emoji render on Windows (default cp1252 raises
 # UnicodeEncodeError). No-op on platforms that are already UTF-8.
@@ -22,11 +23,6 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8")
     except Exception:
         pass
-
-# Resolve the ccusage executable once. On Windows the npm shim is
-# "ccusage.cmd", which subprocess cannot locate from the bare name
-# "ccusage", so resolve the full path (incl. extension) up front.
-CCUSAGE = shutil.which("ccusage") or "ccusage"
 
 def format_number(num):
     """Format number with K/M/B suffix"""
@@ -124,39 +120,17 @@ def format_model_name(model_id):
         return model_id.replace('-', ' ').title()
 
 
-def get_ccusage_data():
-    """Get usage data from ccusage tool with improved error handling"""
-    try:
-        # Get block data for current session
-        blocks_result = subprocess.run(
-            [CCUSAGE, "blocks", "--json", "--offline"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        blocks_data = json.loads(blocks_result.stdout) if blocks_result.returncode == 0 else {}
-        
-        # Get session data
-        session_result = subprocess.run(
-            [CCUSAGE, "session", "--json", "--offline"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        session_data = json.loads(session_result.stdout) if session_result.returncode == 0 else {}
-        
-        # Get daily data for today
-        daily_result = subprocess.run(
-            [CCUSAGE, "daily", "--json", "--offline"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        daily_data = json.loads(daily_result.stdout) if daily_result.returncode == 0 else {}
-        
-        return blocks_data, session_data, daily_data
-    except Exception:
-        return {}, {}, {}
+def format_duration(seconds):
+    """Format a countdown as 2d4h, 2h14m or 14m"""
+    seconds = max(0, int(seconds))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    mins = rem // 60
+    if days:
+        return f"{days}d{hours}h"
+    if hours:
+        return f"{hours}h{mins}m"
+    return f"{mins}m"
 
 def get_current_working_directory():
     """Get the current working directory from environment or pwd"""
@@ -267,8 +241,6 @@ def calculate_status(claude_data=None):
     if claude_data is None:
         claude_data = {}
 
-    blocks_data, session_data, daily_data = get_ccusage_data()
-
     # PRIORITY 1: Check for real context data from Claude Code's JSON input
     # The context_window object contains the actual context tracking data
     real_tokens = None
@@ -340,68 +312,10 @@ def calculate_status(claude_data=None):
             except:
                 pass
     
-    # Get current working directory
-    cwd = get_current_working_directory()
-    
-    # Handle new workspace format in v1.0.92+
-    if 'workspace' in claude_data:
-        workspace_info = claude_data['workspace']
-        if isinstance(workspace_info, dict):
-            cwd = workspace_info.get('current_dir') or cwd
-        # If workspace is not a dict, ignore it
-    elif 'cwd' in claude_data:
-        cwd = claude_data['cwd']
-    
-    # Find current active block, or fallback to most recent block
-    current_block = None
-    block_cost = 0.0
-    block_usage_pct = 0.0
-    time_remaining_mins = 0
-    burn_rate = 0
-    hourly_rate = 0.0
-    block_tokens = 0
-    
-    if 'blocks' in blocks_data and blocks_data['blocks']:
-        # First try to find an active block
-        for block in reversed(blocks_data['blocks']):
-            if block.get('isActive'):
-                current_block = block
-                break
-        
-        # If no active block, use the most recent non-gap block
-        if current_block is None:
-            for block in reversed(blocks_data['blocks']):
-                if not block.get('isGap', False):
-                    current_block = block
-                    break
-        
-        if current_block:
-            block_cost = current_block.get('costUSD', 0.0)
-            block_tokens = current_block.get('totalTokens', 0)
-            
-            # Get burn rate (only available for active blocks)
-            if 'burnRate' in current_block:
-                burn_rate_info = current_block['burnRate']
-                if isinstance(burn_rate_info, dict):
-                    burn_rate = int(burn_rate_info.get('tokensPerMinute', 0))
-                    hourly_rate = burn_rate_info.get('costPerHour', 0.0)
-            
-            # Get remaining time (only available for active blocks)
-            if 'projection' in current_block:
-                projection_info = current_block['projection']
-                if isinstance(projection_info, dict):
-                    time_remaining_mins = projection_info.get('remainingMinutes', 0)
-            
-            # Calculate usage percentage
-            block_limit = 97_675_753  # Standard 5-hour block limit
-            block_usage_pct = (block_tokens / block_limit * 100) if block_limit > 0 else 0
-    
-    # Handle session cost from newer Claude Code versions
     session_cost = 0.0
-    session_tokens = 0
     session_found = False
-    
-    # Try to get session cost from Claude Code's built-in cost tracking (v1.0.85+)
+
+    # Session cost from Claude Code's built-in cost tracking (v1.0.85+)
     if 'cost' in claude_data:
         cost_info = claude_data['cost']
         if isinstance(cost_info, dict):
@@ -411,61 +325,16 @@ def calculate_status(claude_data=None):
         else:
             session_cost = 0.0
         session_found = True
-    elif 'sessions' in session_data and cwd:
-        # Fallback to ccusage session data
-        session_id_from_cwd = cwd.replace('/', '-')
-        
-        for session in session_data['sessions']:
-            session_id = session.get('sessionId', '')
-            if session_id == session_id_from_cwd:
-                session_cost = session.get('totalCost', 0.0)
-                session_tokens = session.get('totalTokens', 0)
-                session_found = True
-                break
-            elif cwd and cwd.split('/')[-1] in session_id:
-                session_cost = session.get('totalCost', 0.0)
-                session_tokens = session.get('totalTokens', 0)
-                session_found = True
 
-    # Use real session cost from Claude Code if available (more accurate than ccusage)
     if claude_session_cost is not None:
         session_cost = claude_session_cost
         session_found = True
 
-    # Get today's total cost
-    today_cost = 0.0
-    today_tokens = 0
-    if 'daily' in daily_data:
-        today = datetime.now().strftime('%Y-%m-%d')
-        for day in daily_data['daily']:
-            if day.get('date', '') == today:
-                today_cost = day.get('totalCost', 0.0)
-                today_tokens = day.get('totalTokens', 0)
-                break
-    
-    # Format time remaining
-    if time_remaining_mins > 60:
-        hours = int(time_remaining_mins / 60)
-        mins = int(time_remaining_mins % 60)
-        time_remaining = f"{hours}h {mins}m"
-    else:
-        time_remaining = f"{int(time_remaining_mins)}m"
-    
-    # Format burn rate as tokens/min
-    if burn_rate > 1_000_000:
-        burn_str = f"{burn_rate/1_000_000:.1f}M/min"
-    elif burn_rate > 1000:
-        burn_str = f"{burn_rate/1000:.0f}K/min"
-    else:
-        burn_str = f"{burn_rate}/min"
-    
-    # Estimate time left
-    time_left = f"~{time_remaining_mins}m" if time_remaining_mins > 0 else "~30m"
-    if time_remaining_mins > 60:
-        hours = int(time_remaining_mins / 60)
-        mins = int(time_remaining_mins % 60)
-        time_left = f"~{hours}h{mins}m"
-    
+    # Subscription rate-limit windows (Pro/Max only, absent until the first API response)
+    rate_limits = claude_data.get('rate_limits')
+    if not isinstance(rate_limits, dict):
+        rate_limits = {}
+
     # Enhanced model detection for v1.0.92+
     model = "Claude"  # Default fallback
     
@@ -487,24 +356,7 @@ def calculate_status(claude_data=None):
             if parsed:
                 model = parsed
     
-    # Fallback to ccusage block data for models
-    elif current_block and 'models' in current_block and current_block['models']:
-        model_names = []
-        seen_models = set()
-        
-        for model_id in reversed(current_block['models']):
-            if model_id != '<synthetic>':
-                parsed_model = format_model_name(model_id)
 
-                # Add to list if we parsed it and haven't seen it before
-                if parsed_model and parsed_model not in seen_models:
-                    model_names.append(parsed_model)
-                    seen_models.add(parsed_model)
-        
-        # Join models with commas if multiple
-        if model_names:
-            model = ", ".join(model_names)
-    
     # Handle context warning for v1.0.88+
     # Show warning when exceeds_200k_tokens flag is set OR when usage is >= 75%
     context_warning = ""
@@ -515,8 +367,6 @@ def calculate_status(claude_data=None):
     
     # Format costs
     session_str = f"${session_cost:.2f}" if session_found else "N/A"
-    today_str = f"${today_cost:.2f}"
-    block_str = f"${block_cost:.2f}"
     
     # Format token count and context window
     if real_tokens is not None and context_window_tokens is not None:
@@ -535,9 +385,7 @@ def calculate_status(claude_data=None):
         # We have real tokens but not context window
         tokens_str = f"📊 {format_number(real_tokens)} tokens"
     else:
-        # Fallback to ccusage estimates
-        display_tokens = block_tokens
-        tokens_str = f"{format_number(display_tokens)} tokens"
+        tokens_str = None
 
 
     # Build status line parts
@@ -556,14 +404,23 @@ def calculate_status(claude_data=None):
         status_parts.append(codeindex_status)
     
     
-    # Continue with existing parts
-    status_parts.extend([
-        f"💰 {session_str} session / {today_str} today / {block_str} block ({time_remaining} left)",
-        f"🔥 {burn_str}",
-        tokens_str,
-        f"{block_usage_pct:.1f}% used",
-        f"{time_left} left"
-    ])
+    status_parts.append(f"💰 {session_str} session")
+
+    limit_parts = []
+    for key, label in (('five_hour', '5h'), ('seven_day', '7d')):
+        window = rate_limits.get(key)
+        if not isinstance(window, dict) or window.get('used_percentage') is None:
+            continue
+        part = f"{label} {window['used_percentage']:.0f}%"
+        resets_at = window.get('resets_at')
+        if resets_at:
+            part += f" ({format_duration(resets_at - time.time())})"
+        limit_parts.append(part)
+    if limit_parts:
+        status_parts.append("⏳ " + " / ".join(limit_parts))
+
+    if tokens_str:
+        status_parts.append(tokens_str)
     
     return " | ".join(status_parts)
 
