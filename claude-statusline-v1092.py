@@ -50,6 +50,12 @@ def format_model_name(model_id):
         return "Sonnet 5.5"
     elif 'fable-5-1' in model_id_lower or 'fable 5.1' in model_id_lower:
         return "Fable 5.1"
+    elif 'haiku-5-5' in model_id_lower or 'haiku 5.5' in model_id_lower:
+        return "Haiku 5.5"
+    elif 'opus-4-8' in model_id_lower or 'opus 4.8' in model_id_lower:
+        return "Opus 4.8"
+    elif 'opus-4-7' in model_id_lower or 'opus 4.7' in model_id_lower:
+        return "Opus 4.7"
     elif 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
         return "Opus 4.6"
     elif 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
