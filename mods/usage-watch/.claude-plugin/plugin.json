@@ -1,0 +1,8 @@
+{
+  "name": "usage-watch",
+  "version": "0.1.0",
+  "description": "Toasts when plan limits or context run high, and pins today's total cost across sessions.",
+  "author": {
+    "name": "William R. Kassebaum"
+  }
+}

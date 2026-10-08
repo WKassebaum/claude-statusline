@@ -1,0 +1,14 @@
+{
+  "name": "claude-statusline",
+  "description": "Companion mods for the claude-statusline Claude Code status line.",
+  "owner": {
+    "name": "William R. Kassebaum"
+  },
+  "plugins": [
+    {
+      "name": "usage-watch",
+      "source": "./mods/usage-watch",
+      "description": "Toasts when plan limits or context run high, and pins today's total cost across sessions."
+    }
+  ]
+}

@@ -93,6 +93,24 @@ The `⏳` segment appears only for claude.ai Pro/Max subscribers, and only after
 - **Rate limits**: 5-hour and 7-day usage percentage, with time until each window resets
 - **Context**: Tokens in the context window, and the percentage used
 
+## 🧩 Companion Mod: usage-watch (optional)
+
+A Claude Code mod (needs Claude Code v2.1.287+) that runs inside Claude Code alongside the statusline and adds what a statusline script cannot:
+
+- **Plan-limit alerts**: a toast when the 5-hour, weekly or spend limit passes 80%, and again at 90%. Re-arms after the window resets.
+- **Context alert**: a toast at 80% context suggesting `/compact`. Re-arms once context drops below 50%.
+- **Today's total**: a pinned line under the prompt, e.g. `📅 $41.20 today across 3 sessions`, summed across every session where the mod is loaded. Each session writes its own small file under `~/.claude/usage-watch/`, so concurrent sessions never overwrite each other. Days follow your local time zone.
+
+Install it by typing this at the prompt of a terminal Claude Code session:
+
+```
+/plugin install usage-watch --marketplace WKassebaum/claude-statusline
+```
+
+Answer `y` to add the marketplace, then pick the user scope. Or from a shell: `claude plugin install usage-watch --marketplace WKassebaum/claude-statusline`.
+
+The daily total only counts spend from sessions where the mod was loaded, starting from when it was installed.
+
 ## 🛠️ Manual Installation
 
 ### For Claude Code v1.0.92+ (Recommended)

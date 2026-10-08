@@ -27,3 +27,6 @@ venv/
 *.backup
 *.bak
 settings.json.backup.*
+# Mod files the Claude Code engine generates on load
+mods/*/tsconfig.json
+mods/*/.claude-plugin/types/
