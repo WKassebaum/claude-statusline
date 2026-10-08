@@ -377,8 +377,8 @@ def calculate_status(claude_data=None):
         if isinstance(model_data, str):
             model_id = model_data
         elif isinstance(model_data, dict):
-            # Try display_name first, then other fields
-            model_id = model_data.get('display_name') or model_data.get('name') or model_data.get('id', '')
+            # Prefer id: display_name can omit the version ("Opus" for claude-opus-5-5)
+            model_id = model_data.get('id') or model_data.get('display_name') or model_data.get('name', '')
         
         # Parse model name from ID using format_model_name()
         if model_id and isinstance(model_id, str):
