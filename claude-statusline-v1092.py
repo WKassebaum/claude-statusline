@@ -36,6 +36,23 @@ def format_number(num):
         return str(num)
 
 
+# Anthropic IDs and display names: claude-fable-5-2, claude-opus-4-1-20250805,
+# claude-opus-5-5[1m], us.anthropic.claude-sonnet-4-5-20250929-v1:0, "Opus 4.1".
+# Versions are capped at two digits so a date stamp (claude-sonnet-4-20250514)
+# is never read as the minor version.
+_CLAUDE_FAMILY_RE = re.compile(
+    r'\b(opus|sonnet|haiku|fable|mythos)[-\s](\d{1,2})(?:[-.](\d{1,2}))?(?!\d)'
+)
+# A family this script does not know yet, e.g. claude-newname-6-1
+_CLAUDE_ANY_RE = re.compile(r'\bclaude-([a-z]+)-(\d{1,2})(?:[-.](\d{1,2}))?(?!\d)')
+
+
+def _family_version(family, major, minor):
+    """Build a display name like "Fable 5.2" or "Sonnet 4" (4-0 reads as 4)"""
+    version = f"{major}.{minor}" if minor and int(minor) else major
+    return f"{family.capitalize()} {version}"
+
+
 def format_model_name(model_id):
     """Format raw model ID into a friendly display name"""
     if not model_id:
@@ -43,51 +60,16 @@ def format_model_name(model_id):
 
     model_id_lower = model_id.lower()
 
-    # Anthropic models (order matters - check more specific patterns first)
-    if 'opus-5-5' in model_id_lower or 'opus 5.5' in model_id_lower:
-        return "Opus 5.5"
-    elif 'sonnet-5-5' in model_id_lower or 'sonnet 5.5' in model_id_lower:
-        return "Sonnet 5.5"
-    elif 'fable-5-1' in model_id_lower or 'fable 5.1' in model_id_lower:
-        return "Fable 5.1"
-    elif 'haiku-5-5' in model_id_lower or 'haiku 5.5' in model_id_lower:
-        return "Haiku 5.5"
-    elif 'mythos-5-1' in model_id_lower or 'mythos 5.1' in model_id_lower:
-        return "Mythos 5.1"
-    elif 'fable-5' in model_id_lower or 'fable 5' in model_id_lower:
-        return "Fable 5"
-    elif 'mythos-5' in model_id_lower or 'mythos 5' in model_id_lower:
-        return "Mythos 5"
-    elif 'opus-5' in model_id_lower or 'opus 5' in model_id_lower:
-        return "Opus 5"
-    elif 'sonnet-5' in model_id_lower or 'sonnet 5' in model_id_lower:
-        return "Sonnet 5"
-    elif 'opus-4-8' in model_id_lower or 'opus 4.8' in model_id_lower:
-        return "Opus 4.8"
-    elif 'opus-4-7' in model_id_lower or 'opus 4.7' in model_id_lower:
-        return "Opus 4.7"
-    elif 'opus-4-6' in model_id_lower or 'opus 4.6' in model_id_lower:
-        return "Opus 4.6"
-    elif 'opus-4-5' in model_id_lower or 'opus 4.5' in model_id_lower:
-        return "Opus 4.5"
-    elif 'opus-4-1' in model_id_lower or 'opus 4.1' in model_id_lower:
-        return "Opus 4.1"
-    elif 'opus-4' in model_id_lower or 'opus 4' in model_id_lower:
-        return "Opus 4"
-    elif 'sonnet-4-7' in model_id_lower or 'sonnet 4.7' in model_id_lower:
-        return "Sonnet 4.7"
-    elif 'sonnet-4-6' in model_id_lower or 'sonnet 4.6' in model_id_lower:
-        return "Sonnet 4.6"
-    elif 'sonnet-4-5' in model_id_lower or 'sonnet 4.5' in model_id_lower:
-        return "Sonnet 4.5"
-    elif 'sonnet-4' in model_id_lower or 'sonnet 4' in model_id_lower:
-        return "Sonnet 4"
-    elif 'sonnet-3-5' in model_id_lower or 'sonnet 3.5' in model_id_lower or 'sonnet-20241022' in model_id_lower:
+    # Anthropic models: parse family + version so new releases need no edit
+    match = _CLAUDE_FAMILY_RE.search(model_id_lower)
+    if match:
+        return _family_version(*match.groups())
+
+    # Unversioned and legacy Anthropic IDs
+    if 'sonnet-20241022' in model_id_lower:
         return "Sonnet 3.5"
     elif 'sonnet' in model_id_lower:
         return "Sonnet"
-    elif 'haiku-4-5' in model_id_lower or 'haiku 4.5' in model_id_lower:
-        return "Haiku 4.5"
     elif 'haiku' in model_id_lower:
         return "Haiku"
 
@@ -145,6 +127,9 @@ def format_model_name(model_id):
 
     # Generic fallback
     elif 'claude-' in model_id_lower:
+        match = _CLAUDE_ANY_RE.search(model_id_lower)
+        if match:
+            return _family_version(*match.groups())
         return model_id.replace('claude-', '').replace('-', ' ').title()
     else:
         return model_id.replace('-', ' ').title()
